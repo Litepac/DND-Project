@@ -10,7 +10,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Client-side auth (kræver Microsoft.AspNetCore.Components.Authorization)
+// Client-side auth
 builder.Services.AddAuthorizationCore();
 
 // Tokenlager + delegating handler
@@ -23,15 +23,18 @@ var apiBaseAddress =
     Environment.GetEnvironmentVariable("Api__BaseAddress") ??
     "http://localhost:5230";
 
-// Navngiven HttpClient til API'et (med handleren der sætter Authorization-header)
+// Navngiven HttpClient til API'et
 builder.Services.AddHttpClient("Api", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5230/");
+    client.BaseAddress = new Uri(apiBaseAddress);
 })
 .AddHttpMessageHandler<TokenAuthorizationMessageHandler>();
 
-// Standard HttpClient -> brug den navngivne Api
+// Standard HttpClient -> brug den navngivne "Api"
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
+
+// 👉 her registrerer vi StenaService, nu hvor HttpClient findes
+builder.Services.AddScoped<StenaService>();
 
 await builder.Build().RunAsync();

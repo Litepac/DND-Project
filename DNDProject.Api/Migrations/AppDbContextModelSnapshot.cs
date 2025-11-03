@@ -15,7 +15,7 @@ namespace DNDProject.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.9");
+            modelBuilder.HasAnnotation("ProductVersion", "8.0.10");
 
             modelBuilder.Entity("DNDProject.Api.Models.ApplicationUser", b =>
                 {
@@ -92,6 +92,9 @@ namespace DNDProject.Api.Migrations
 
                     b.Property<int?>("CustomerId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("TEXT");
 
                     b.Property<double?>("LastFillPct")
                         .HasColumnType("REAL");
@@ -199,7 +202,7 @@ namespace DNDProject.Api.Migrations
                             Id = 1,
                             ContainerId = 1,
                             FillPct = 88.0,
-                            Timestamp = new DateTime(2025, 9, 8, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Timestamp = new DateTime(2025, 10, 13, 0, 0, 0, 0, DateTimeKind.Utc),
                             WeightKg = 110.0
                         },
                         new
@@ -207,7 +210,7 @@ namespace DNDProject.Api.Migrations
                             Id = 2,
                             ContainerId = 1,
                             FillPct = 92.0,
-                            Timestamp = new DateTime(2025, 9, 22, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Timestamp = new DateTime(2025, 10, 27, 0, 0, 0, 0, DateTimeKind.Utc),
                             WeightKg = 125.0
                         },
                         new
@@ -215,9 +218,50 @@ namespace DNDProject.Api.Migrations
                             Id = 3,
                             ContainerId = 2,
                             FillPct = 51.0,
-                            Timestamp = new DateTime(2025, 9, 15, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Timestamp = new DateTime(2025, 10, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             WeightKg = 480.0
                         });
+                });
+
+            modelBuilder.Entity("DNDProject.Api.Models.StenaReceipt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("Amount")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("ContainerTypeText")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EakCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemNumber")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RawContainer")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceFile")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StenaReceipts");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

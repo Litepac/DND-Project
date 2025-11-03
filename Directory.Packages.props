@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Blazor/ASP.NET -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.10" />

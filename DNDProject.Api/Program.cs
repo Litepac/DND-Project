@@ -140,6 +140,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true; // kun i dev
 }
 
 app.UseCors();
@@ -148,7 +149,20 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// seed brugere/roller
-await IdentitySeed.SeedAsync(app.Services);
+// --- Seeding & migrations i et scope ---
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var env = services.GetRequiredService<IWebHostEnvironment>();
+    var db  = services.GetRequiredService<AppDbContext>();
+
+    await db.Database.MigrateAsync();
+
+    if (env.IsDevelopment())
+        await IdentitySeed.SeedAsync(app.Services);
+        await StenaDataSeed.SeedAsync(app.Services);
+}
+
 
 app.Run();
+

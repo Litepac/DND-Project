@@ -1,0 +1,336 @@
+@page "/stena"
+@inject HttpClient Http
+@using System.Net.Http.Json
+
+<h3 class="mb-3">Stena – overblik</h3>
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">
+        Kunne ikke hente data fra API'et:<br />
+        @errorMessage
+    </div>
+}
+else if (isLoading)
+{
+    <p>Henter...</p>
+}
+else if (dashboard is null)
+{
+    <p>Ingen data.</p>
+}
+else
+{
+    <!-- KPI cards -->
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="card st-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Rækker i Stena-filer</div>
+                    <div class="fs-3 fw-semibold">@dashboard.totalRows.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card st-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Total vægt (KG)</div>
+                    <div class="fs-3 fw-semibold">@dashboard.totalKg.ToString("N0")</div>
+                    <div class="text-muted small">= @((dashboard.totalKg / 1000d).ToString("N1")) tons</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card st-card h-100">
+                <div class="card-body">
+                    <div class="small text-muted">Tømninger (STK)</div>
+                    <div class="fs-3 fw-semibold">@dashboard.totalEmptyings.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar + tabs -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="btn-group" role="group" aria-label="Periode">
+            <button class="btn btn-sm @(selectedDays == 7 ? "btn-primary" : "btn-outline-primary")" @onclick="(() => ChangeDays(7))">7 dage</button>
+            <button class="btn btn-sm @(selectedDays == 30 ? "btn-primary" : "btn-outline-primary")" @onclick="(() => ChangeDays(30))">30 dage</button>
+            <button class="btn btn-sm @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="(() => ChangeDays(90))">90 dage</button>
+        </div>
+
+        <ul class="nav nav-pills">
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "overview" ? "active" : "")" @onclick="ShowOverview">
+                    Oversigt
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "raw" ? "active" : "")" @onclick="ShowRaw">
+                    Rå data
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    @if (activeTab == "overview")
+    {
+        <!-- OVERVIEW -->
+        <div class="row g-3 mb-3">
+            <!-- Vægt pr dag -->
+            <div class="col-12 col-lg-6">
+                <div class="card st-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="card-title mb-0">Vægt pr. dag (seneste @selectedDays dage)</h5>
+                                <div class="text-muted small">kun rækker med enhed = KG</div>
+                            </div>
+                        </div>
+
+                        @if (dailyWeights is null || dailyWeights.Count == 0)
+                        {
+                            <div class="text-muted">Ingen vægtdata i perioden.</div>
+                        }
+                        else
+                        {
+                            <div class="st-bar-chart">
+                                @foreach (var d in dailyWeights)
+                                {
+                                    var pct = maxDailyWeight > 0 ? (d.totalKg / maxDailyWeight) * 100 : 0;
+                                    <div class="st-bar" title="@($"{d.date:dd-MM-yyyy}: {d.totalKg:N0} kg")">
+                                        <div class="st-bar-inner" style="height:@pct%"></div>
+                                        <div class="st-bar-label">@d.date:dd.MM</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top tømninger -->
+            <div class="col-12 col-lg-6">
+                <div class="card st-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-2">Top tømninger (seneste @selectedDays dage)</h5>
+                        @if (topEmptyings is null || topEmptyings.Count == 0)
+                        {
+                            <div class="text-muted">Ingen tømninger i perioden.</div>
+                        }
+                        else
+                        {
+                            <div class="st-hbar-list">
+                                @foreach (var t in topEmptyings)
+                                {
+                                    var pct = maxEmptyingCount > 0 ? (t.count / (double)maxEmptyingCount) * 100 : 0;
+                                    <div class="st-hbar-row">
+                                        <div class="st-hbar-title">@t.type</div>
+                                        <div class="st-hbar-track">
+                                            <div class="st-hbar-fill" style="width:@pct%"></div>
+                                        </div>
+                                        <div class="st-hbar-value">@t.count</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seneste vægte -->
+        <div class="card st-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="card-title mb-0">Seneste vægte (KG)</h5>
+
+                    <div class="d-flex gap-2">
+                        <input class="form-control form-control-sm" placeholder="Søg i vare/navn..." style="min-width:180px" @bind="searchText" />
+                        <select class="form-select form-select-sm" style="min-width:150px" @bind="filterEak">
+                            <option value="">Alle EAK</option>
+                            @foreach (var eak in latestWeights.Select(x => x.eakCode).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())
+                            {
+                                <option value="@eak">@eak</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:110px;">Dato</th>
+                                <th>Vare</th>
+                                <th style="width:100px;">EAK</th>
+                                <th style="width:80px;" class="text-end">KG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in FilteredLatest())
+                            {
+                                <tr>
+                                    <td>@row.date?.ToString("dd-MM-yyyy")</td>
+                                    <td>@row.itemName</td>
+                                    <td>@row.eakCode</td>
+                                    <td class="text-end">@row.amount?.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- RÅ DATA -->
+        <div class="card st-card">
+            <div class="card-body">
+                <h5>Rå data (seneste @latestWeights.Count rækker)</h5>
+                <p class="text-muted small mb-3">Her kan du se præcis hvad der ligger i StenaReceipts lige nu.</p>
+
+                <div class="table-responsive" style="max-height:500px; overflow-y:auto;">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Dato</th>
+                                <th>Vare</th>
+                                <th>Enhed</th>
+                                <th class="text-end">Mængde</th>
+                                <th>EAK</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in latestWeights)
+                            {
+                                <tr>
+                                    <td>@row.date?.ToString("dd-MM-yyyy")</td>
+                                    <td>@row.itemName</td>
+                                    <td>@row.unit</td>
+                                    <td class="text-end">@row.amount?.ToString("N0")</td>
+                                    <td>@row.eakCode</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    // state
+    private bool isLoading = true;
+    private string? errorMessage;
+    private DashboardDto? dashboard;
+
+    private List<DailyWeightDto> dailyWeights = new();
+    private List<TopEmptyingDto> topEmptyings = new();
+    private List<LatestWeightDto> latestWeights = new();
+
+    private double maxDailyWeight;
+    private int maxEmptyingCount;
+
+    private int selectedDays = 30;
+    private string activeTab = "overview";
+
+    private string searchText = "";
+    private string filterEak = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
+
+    private async Task LoadAll()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            dashboard = await Http.GetFromJsonAsync<DashboardDto>("api/stena/dashboard");
+
+            await LoadPeriodData();
+            await LoadLatestWeights();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadPeriodData()
+    {
+        dailyWeights = await Http.GetFromJsonAsync<List<DailyWeightDto>>($"api/stena/weights/daily?days={selectedDays}") ?? new();
+        maxDailyWeight = dailyWeights.Count > 0 ? dailyWeights.Max(x => x.totalKg) : 0;
+
+        topEmptyings = await Http.GetFromJsonAsync<List<TopEmptyingDto>>($"api/stena/emptyings/top?days={selectedDays}") ?? new();
+        maxEmptyingCount = topEmptyings.Count > 0 ? topEmptyings.Max(x => x.count) : 0;
+    }
+
+    private async Task LoadLatestWeights()
+    {
+        latestWeights = await Http.GetFromJsonAsync<List<LatestWeightDto>>("api/stena/weights/latest?take=200") ?? new();
+    }
+
+    private async Task ChangeDays(int days)
+    {
+        if (selectedDays == days) return;
+        selectedDays = days;
+        await LoadPeriodData();
+        StateHasChanged();
+    }
+
+    private void ShowOverview() => activeTab = "overview";
+    private void ShowRaw() => activeTab = "raw";
+
+    private IEnumerable<LatestWeightDto> FilteredLatest()
+    {
+        IEnumerable<LatestWeightDto> q = latestWeights;
+
+        if (!string.IsNullOrWhiteSpace(filterEak))
+            q = q.Where(x => string.Equals(x.eakCode, filterEak, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+            q = q.Where(x => x.itemName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true);
+
+        return q;
+    }
+
+    // DTOs
+    private sealed class DashboardDto
+    {
+        public int totalRows { get; set; }
+        public double totalKg { get; set; }
+        public int totalEmptyings { get; set; }
+    }
+
+    private sealed class DailyWeightDto
+    {
+        public DateTime date { get; set; }
+        public double totalKg { get; set; }
+    }
+
+    private sealed class TopEmptyingDto
+    {
+        public string type { get; set; } = "";
+        public int count { get; set; }
+    }
+
+    private sealed class LatestWeightDto
+    {
+        public DateTime? date { get; set; }
+        public string? itemNumber { get; set; }
+        public string? itemName { get; set; }
+        public string? unit { get; set; }
+        public double? amount { get; set; }
+        public string? eakCode { get; set; }
+    }
+}

@@ -11,6 +11,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser> // <— ændret h
     public DbSet<Container>   Containers   => Set<Container>();
     public DbSet<Customer>    Customers    => Set<Customer>();
     public DbSet<PickupEvent> PickupEvents => Set<PickupEvent>();
+    public DbSet<StenaReceipt> StenaReceipts => Set<StenaReceipt>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

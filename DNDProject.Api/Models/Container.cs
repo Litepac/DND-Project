@@ -34,6 +34,9 @@ namespace DNDProject.Api.Models
         /// <summary>Relation til kunde (kan oprettes senere)</summary>
         public int? CustomerId { get; set; }
         // public Customer? Customer { get; set; }  // tilføjes når du laver Customer-modellen
+
+        public string? ExternalId { get; set; } // fx "Enhednr" fra Stena
+
     }
 }
 
