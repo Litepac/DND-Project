@@ -7,6 +7,15 @@
 - Sebastian Højland (Sebastianhoejland)
 - Rasmus Møller (Litepac aka the goat)
 
+## Hvad kan løsningen?
+
+Systemet består af en ASP.NET Core API og et Blazor WebAssembly-frontend, der arbejder sammen om at hjælpe affaldskunder og Stena-medarbejdere med at vælge de mest passende containere. Løsningen gør det muligt at:
+
+- **Indsamle kundeinput:** Brugere kan registrere mængde og type affald, så systemet får et datagrundlag for beregninger.
+- **Anbefale containerløsninger:** På baggrund af input foreslår systemet en passende containerstørrelse og afhentningsfrekvens, så over- og underfyldning undgås.
+- **Skabe overblik for kunder:** Kunder kan se historik og udvikling i deres anbefalinger gennem visuelle oversigter, så de bedre kan forstå deres affaldsbehov over tid.
+- **Understøtte medarbejdere:** Medarbejdere får et værktøj til at identificere kunder med uhensigtsmæssige containerstørrelser og kan se rapporter om CO₂-besparelser og logistikoptimering.
+
 ## SystemKrav
 
 - **.NET 8 SDK**
