@@ -160,7 +160,8 @@ using (var scope = app.Services.CreateScope())
 
     if (env.IsDevelopment())
         await IdentitySeed.SeedAsync(app.Services);
-        await StenaDataSeed.SeedAsync(app.Services);
+       //----- await StenaDataSeed.SeedAsync(app.Services);
+       //---- Fjernet for at få excel ud af billedet.
 }
 
 
