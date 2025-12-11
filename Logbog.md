@@ -68,62 +68,51 @@ Der mangler dog stadig at blive tilføjet rigtige grafer og bedre interaktivitet
 
 # Logbog – Uge 50
 
-I uge 50 blev der arbejdet intensivt på at etablere fundamentet for Stena-delen af projektet. Fokus var på at få API’et korrekt koblet til databasen, forstå datagrundlaget og begynde opbygningen af et kunde-dashboard.
+Ugens arbejde fokuserede på Stena-delen af systemet: database­forståelse, API-rettelser og opbygning af analysevisningen for tømningseffektivitet. Der blev arbejdet både i backend og frontend, og flere dele af infrastrukturen kom på plads.
 
-## Databaseforbindelse og struktur
+## Database og modeller
 
-- Projektet blev forbundet korrekt til Stena SQL-databasen via EF Core.
-- Modtagelsestabellen (`dbo.Modtagelse`) blev analyseret i dybden for at forstå relevante felter.
-- Det blev afklaret, at `LevNr` fungerer som det reelle CustomerID.
-- Relevante datafelter blev kortlagt:
-  - `Varenummer` bestemmer typen af tømning/affald.
-  - `Unit = 'KG'` betyder, at `Antal` repræsenterer vægt i kilo.
-  - `Unit = 'STK'` bruges til faste tømninger, hvor `Antal` typisk er 1.
+- `Kapacitet_og_enhed_opdateret` blev analyseret og mappet korrekt til EF Core.
+- Modellen **ContainerCapacity** blev opdateret, så den matcher tabellens faktiske kolonner.
+- Konflikter i DbContext blev identificeret (flere modeller pegede på samme tabel).
+- Mappingen af **StenaReceipt** blev rettet så:
+  - `LevNr` → CustomerKey  
+  - `Antal` → Amount  
+  - `Varenummer` → ItemNumber  
+  - øvrige felter nu binder korrekt.
 
-## Backend – API-udvikling
+## Backend – API-udvikling og rettelser
 
-Der blev oprettet et nyt sæt API-endpoints til Stena-kundedata:
+To nye endpoints blev bygget til tømningseffektivitet:
 
-- `GET /api/stena/customers/summary`  
-  Returnerer en oversigt over alle kunder med:
-  - Samlet vægt
-  - Antal modtagelser
-  - Første og sidste modtagelsesdato
+- `GET /api/stena/efficiency/summary` – samlet overblik pr. kunde  
+- `GET /api/stena/efficiency/customer/{levNr}` – detaljer for én kunde  
 
-- `GET /api/stena/customers/{customerKey}/dashboard`  
-  Returnerer detaljer for én kunde, inkl.:
-  - Total vægt
-  - Antal modtagelser
-  - Tidsserie pr. måned (vægtudvikling)
+Der blev desuden:
 
-Derudover blev der udviklet logik til:
+- Oprettet nye DTO’er:
+  - `ContainerEfficiencySummaryDto`
+  - `ContainerEfficiencyDetailDto`
+  - `ContainerEmptyingDto`
+- Implementeret beregninger for fyldningsgrad, ineffektive tømninger og gennemsnit.
+- Rettet fejl i controlleren, bl.a. manglende namespace-referencer og forkerte datatyper.
+- Fundet en EF-fejl ved opstart: samme tabel blev mappet af flere modeller.  
+  Dette giver en **500 Internal Server Error** og skal løses, før efficiency-API’et kan fungere.
 
-- Parsing af `Antal` (nvarchar) til decimal — understøtter både dansk og internationalt talformat.
-- Aggregation af data pr. kunde og pr. måned.
-- DTO’er blev oprettet og stabiliseret:
-  - `CustomerSummaryDto`
-  - `CustomerDashboardDto`
-  - `CustomerTimeseriesPointDto`
+## Frontend – Blazor
 
-## Fejlrettelser
+- Siden **tømningsanalyse (660 L container)** blev designet og sat op.
+- Kunde-dashboardet fungerer nu igen efter API-rettelser.
+- Analyse-UI'et viser:
+  - kundeliste,
+  - valg af periode og tærskel,
+  - placeholder for detaljeret visning.
+- Siden kan ikke hente data endnu, da API’et returnerer 404/500 pga. manglende færdiggørelse af efficiency-endpoints.
 
-- Rettede kolonnenavnsfejl og EF Core-mapping-issues.
-- Løste 500-fejl forårsaget af summering på nvarchar-felter.
-- Ensrettede datatyper, herunder `CustomerKey` (string → int).
-- Fjernede gamle og fejlbehæftede Stena-controllere, som forhindrede projektet i at bygge.
+## Status for dagen
 
-## Frontend (Blazor)
+- Kunde-dashboard virker.  
+- API’et til tømningseffektivitet er næsten færdigt, men fejler ved opstart pga. EF-konflikt.  
+- Tømningsanalyse-siden er bygget, men venter på at API’et fungerer.
 
-- Opsatte fuldt dataflow mellem frontend og backend.
-- Implementerede første version af et kunde-dashboard-view.
-- Tilføjede oversigtsside baseret på summary-endpointet.
-- Implementerede fejlvisning og loading-tilstande.
-
-## Overblik
-
-Ved udgangen af uge 50 er grundinfrastrukturen på plads:
-
-- API’et fungerer stabilt og leverer korrekte kundedata.
-- Blazor kan hente og visualisere både kundesummaries og detaljer.
-- Datamodellen i Stena-tabellen er nu fuldt forstået.
-- Alt er klar til at bygge videre på analyser, grafer og KPI’er.
+Når EF-konflikten omkring **ContainerCapacity** er løst, vil både summary-endpointet og kundedetalje-endpointet fungere, og analysevisningen kan kobles helt sammen.
