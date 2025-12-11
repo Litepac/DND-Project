@@ -1,0 +1,77 @@
+@page "/test-db"
+@inject HttpClient Http
+
+<h3>DB test</h3>
+
+@if (containers is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (containers.Count == 0)
+{
+    <p>Ingen data fundet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Type</th>
+                <th>Materiale</th>
+                <th>Størrelse (L)</th>
+                <th>Ugentlig mængde (kg)</th>
+                <th>Sidste fyld%</th>
+                <th>Sidste afhentning</th>
+                <th>Frekvens (dage)</th>
+                <th>CustomerId</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in containers)
+        {
+            <tr>
+                <td>@c.Id</td>
+                <td>@c.Type</td>
+                <td>@c.Material</td>
+                <td>@c.SizeLiters</td>
+                <td>@c.WeeklyAmountKg</td>
+                <td>@c.LastFillPct</td>
+                <td>@c.LastPickupDate?.ToString("yyyy-MM-dd")</td>
+                <td>@c.PreferredPickupFrequencyDays</td>
+                <td>@c.CustomerId</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ContainerDto>? containers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // porten SKAL matche den du ser i API-konsollen (5230 i dine screenshots)
+        containers = await Http.GetFromJsonAsync<List<ContainerDto>>(
+            "http://localhost:5230/api/testdb");
+    }
+
+    public class ContainerDto
+    {
+        public int Id { get; set; }
+        public string? Type { get; set; }
+
+        // enum sendes som tal i JSON → vi modtager bare som int her
+        public int Material { get; set; }
+
+        public int SizeLiters { get; set; }
+
+        // 👇 matcher nu din API-model (float)
+        public float WeeklyAmountKg { get; set; }
+        public float? LastFillPct { get; set; }
+
+        public DateTime? LastPickupDate { get; set; }
+        public int? PreferredPickupFrequencyDays { get; set; }
+        public int? CustomerId { get; set; }
+    }
+}
