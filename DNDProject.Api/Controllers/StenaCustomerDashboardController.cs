@@ -16,6 +16,9 @@ namespace DNDProject.Api.Controllers
     {
         private readonly AppDbContext _db;
 
+        // tærskel for “ineffektiv” kunde
+        private const decimal LowAverageWeightThresholdKg = 100m;
+
         public StenaCustomerDashboardController(AppDbContext db)
         {
             _db = db;
@@ -42,12 +45,12 @@ namespace DNDProject.Api.Controllers
         }
 
         // GET: api/stena/customers/summary
+        // Oversigt over alle kunder: total vægt, antal modtagelser, periode, ineffektiv-flag
         [HttpGet("summary")]
         public async Task<ActionResult<List<CustomerSummaryDto>>> GetCustomerSummary()
         {
+            // Hent kun de felter vi bruger – stadig 1 DB-call
             var raw = await _db.StenaReceipts
-                // Ignorer rækker uden kunde-id (LevNr = NULL)
-                .Where(r => r.CustomerKey != null)
                 .Select(r => new
                 {
                     r.CustomerKey,
@@ -58,22 +61,33 @@ namespace DNDProject.Api.Controllers
                 })
                 .ToListAsync();
 
+            // Smid rækker uden customerKey væk (kan tilpasses)
             var data = raw
+                .Where(r => r.CustomerKey != null)
                 .GroupBy(r => new { r.CustomerKey, r.CustomerName })
                 .Select(g =>
                 {
+                    // total kilo (kun KG-rækker)
                     var weightKg = g
                         .Where(x => x.Unit == "KG")
                         .Sum(x => ParseAmountToDecimal(x.Amount));
 
+                    var receiptCount = g.Count();
+                    var avgPerReceipt = receiptCount == 0
+                        ? 0m
+                        : weightKg / receiptCount;
+
                     return new CustomerSummaryDto
                     {
-                        CustomerKey   = g.Key.CustomerKey?.ToString() ?? "UKENDT",
-                        CustomerName  = g.Key.CustomerName ?? "(ukendt navn)",
+                        CustomerKey = g.Key.CustomerKey?.ToString() ?? string.Empty,
+                        CustomerName = g.Key.CustomerName,
+
                         TotalWeightKg = (float)weightKg,
-                        ReceiptCount  = g.Count(),
-                        FirstDate     = g.Min(x => x.ReceiptDate),
-                        LastDate      = g.Max(x => x.ReceiptDate)
+                        ReceiptCount = receiptCount,
+                        FirstDate = g.Min(x => x.ReceiptDate),
+                        LastDate = g.Max(x => x.ReceiptDate),
+                        AverageWeightPerReceiptKg = (float)avgPerReceipt,
+                        IsLowAverageWeight = avgPerReceipt < LowAverageWeightThresholdKg
                     };
                 })
                 .OrderByDescending(x => x.TotalWeightKg)
@@ -83,6 +97,7 @@ namespace DNDProject.Api.Controllers
         }
 
         // GET: api/stena/customers/{customerKey}/dashboard?months=6
+        // Detaljer for én kunde + time series (vægt pr. måned)
         [HttpGet("{customerKey}/dashboard")]
         public async Task<ActionResult<CustomerDashboardDto>> GetCustomerDashboard(
             string customerKey,
@@ -117,18 +132,24 @@ namespace DNDProject.Api.Controllers
                 .Where(x => x.Unit == "KG")
                 .Sum(x => ParseAmountToDecimal(x.Amount));
 
-            var first = raw.First();
+            var receiptCount = raw.Count;
+            var avgPerReceipt = receiptCount == 0
+                ? 0m
+                : weightKgTotal / receiptCount;
 
             var summary = new CustomerSummaryDto
             {
-                CustomerKey   = first.CustomerKey?.ToString() ?? "UKENDT",
-                CustomerName  = first.CustomerName ?? "(ukendt navn)",
+                CustomerKey = raw.First().CustomerKey?.ToString() ?? string.Empty,
+                CustomerName = raw.First().CustomerName,
                 TotalWeightKg = (float)weightKgTotal,
-                ReceiptCount  = raw.Count,
-                FirstDate     = raw.Min(x => x.ReceiptDate),
-                LastDate      = raw.Max(x => x.ReceiptDate)
+                ReceiptCount = receiptCount,
+                FirstDate = raw.Min(x => x.ReceiptDate),
+                LastDate = raw.Max(x => x.ReceiptDate),
+                AverageWeightPerReceiptKg = (float)avgPerReceipt,
+                IsLowAverageWeight = avgPerReceipt < LowAverageWeightThresholdKg
             };
 
+            // tidsserie: pr. måned, kun KG
             var timeseries = raw
                 .Where(x => x.Unit == "KG")
                 .GroupBy(x => new { x.ReceiptDate.Year, x.ReceiptDate.Month })
@@ -139,8 +160,8 @@ namespace DNDProject.Api.Controllers
 
                     return new CustomerTimeseriesPointDto
                     {
-                        PeriodStart   = new DateTime(g.Key.Year, g.Key.Month, 1),
-                        Label         = $"{g.Key.Year}-{g.Key.Month:00}",
+                        PeriodStart = new DateTime(g.Key.Year, g.Key.Month, 1),
+                        Label = $"{g.Key.Year}-{g.Key.Month:00}",
                         TotalWeightKg = (float)monthWeight
                     };
                 })
@@ -148,7 +169,7 @@ namespace DNDProject.Api.Controllers
 
             var dto = new CustomerDashboardDto
             {
-                Summary    = summary,
+                Summary = summary,
                 Timeseries = timeseries
             };
 

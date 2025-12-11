@@ -1,7 +1,8 @@
+// DNDProject.Web/Models/CustomerDashboardDTOs.cs
 using System;
 using System.Collections.Generic;
 
-namespace DNDProject.Api.Models
+namespace DNDProject.Web.Models
 {
     public class CustomerSummaryDto
     {
@@ -20,7 +21,7 @@ namespace DNDProject.Api.Models
 
     public class CustomerTimeseriesPointDto
     {
-        public DateTime PeriodStart { get; set; }   // 1. i måneden
+        public DateTime PeriodStart { get; set; }           // 1. i måneden
         public string Label { get; set; } = string.Empty;   // "2025-09"
         public float TotalWeightKg { get; set; }
     }
