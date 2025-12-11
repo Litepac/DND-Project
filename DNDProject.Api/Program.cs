@@ -10,9 +10,9 @@ using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// EF Core + SQLite
+// EF Core + SQL Server  👈 ændret fra SQLite
 builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+    o.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Controllers
 builder.Services.AddControllers();
@@ -133,7 +133,6 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -156,15 +155,15 @@ using (var scope = app.Services.CreateScope())
     var env = services.GetRequiredService<IWebHostEnvironment>();
     var db  = services.GetRequiredService<AppDbContext>();
 
-    await db.Database.MigrateAsync();
+    // Vi kører ikke EF-migrationer mod Stena-databasen
+    // await db.Database.MigrateAsync();
 
-    if (env.IsDevelopment())
-        await IdentitySeed.SeedAsync(app.Services);
-       //----- await StenaDataSeed.SeedAsync(app.Services);
-       //---- Fjernet for at få excel ud af billedet.
-       //---Fjern at some point.
+    // Midlertidigt: slå Identity seeding fra, fordi der ikke findes en Customers-tabel i Stena-DB
+    // if (env.IsDevelopment())
+    //     await IdentitySeed.SeedAsync(app.Services);
+
+    //----- await StenaDataSeed.SeedAsync(app.Services);
 }
 
 
 app.Run();
-
