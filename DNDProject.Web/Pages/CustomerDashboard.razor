@@ -1,0 +1,177 @@
+@page "/customer-dashboard"
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using System.Linq
+
+<h3>Kunde-dashboard (Stena)</h3>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (summaries is null)
+{
+    <p><em>Henter kundeliste...</em></p>
+}
+else
+{
+    <div class="row">
+        <!-- VENSTRE: liste over alle kunder -->
+        <div class="col-md-5">
+            <h5>Alle kunder</h5>
+            <p class="text-muted">Klik på en kunde for at se detaljer.</p>
+
+            <div class="table-responsive" style="max-height: 450px; overflow:auto;">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Kunde</th>
+                            <th class="text-end">Total kg</th>
+                            <th class="text-end">Antal modtagelser</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var c in summaries)
+                    {
+                        bool isSelected = c.CustomerKey == selectedCustomerKey;
+                        var rowClass = isSelected ? "table-primary" : string.Empty;
+
+                        <tr class="@rowClass"
+                            @onclick="@(() => SelectCustomer(c.CustomerKey))"
+                            style="cursor:pointer;">
+                            <td>@c.CustomerKey</td>
+                            <td class="text-end">@c.TotalWeightKg.ToString("N0")</td>
+                            <td class="text-end">@c.ReceiptCount.ToString("N0")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- HØJRE: detaljer for valgt kunde -->
+        <div class="col-md-7">
+            @if (isLoadingDetail)
+            {
+                <p><em>Henter detaljer...</em></p>
+            }
+            else if (detail is null)
+            {
+                <p class="text-muted">Vælg en kunde til venstre for at se detaljer.</p>
+            }
+            else
+            {
+                <h5>Detaljer for: @detail.Summary.CustomerKey</h5>
+                <p>
+                    Total vægt: <strong>@detail.Summary.TotalWeightKg.ToString("N0") kg</strong><br />
+                    Antal modtagelser: <strong>@detail.Summary.ReceiptCount.ToString("N0")</strong><br />
+                    Periode:
+                    <strong>@detail.Summary.FirstDate?.ToString("yyyy-MM-dd")</strong>
+                    –
+                    <strong>@detail.Summary.LastDate?.ToString("yyyy-MM-dd")</strong>
+                </p>
+
+                @if (detail.Timeseries.Count == 0)
+                {
+                    <p>Ingen tidsserie-data tilgængelig.</p>
+                }
+else
+{
+    // Først ren C# (ingen @ nødvendigt her)
+    var maxKg = detail.Timeseries.Max(p => p.TotalWeightKg);
+    if (maxKg <= 0) maxKg = 1;
+
+    <h6>Udvikling (kg pr. måned)</h6>
+
+    <div class="mb-2">
+        @foreach (var p in detail.Timeseries)
+        {
+            var widthPct = (p.TotalWeightKg / maxKg) * 100f;
+
+            <div class="mb-1">
+                <div class="d-flex justify-content-between">
+                    <span>@p.Label</span>
+                    <span>@p.TotalWeightKg.ToString("N0") kg</span>
+                </div>
+                <div class="progress" style="height: 12px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width:@widthPct%;"
+                         aria-valuenow="@p.TotalWeightKg"
+                         aria-valuemin="0" aria-valuemax="@maxKg">
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<CustomerSummaryDto>? summaries;
+    private CustomerDashboardDto? detail;
+
+    private string? errorMessage;
+    private string? selectedCustomerKey;
+    private bool isLoadingDetail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            summaries = await Http.GetFromJsonAsync<List<CustomerSummaryDto>>(
+                "api/stena/customers/summary");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task SelectCustomer(string customerKey)
+    {
+        selectedCustomerKey = customerKey;
+        isLoadingDetail = true;
+
+        try
+        {
+            detail = await Http.GetFromJsonAsync<CustomerDashboardDto>(
+                $"api/stena/customers/{Uri.EscapeDataString(customerKey)}/dashboard?months=6");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoadingDetail = false;
+            StateHasChanged();
+        }
+    }
+
+    // DTO'er matcher det API'et returnerer
+    private class CustomerSummaryDto
+    {
+        public string CustomerKey { get; set; } = string.Empty;
+        public float TotalWeightKg { get; set; }
+        public int ReceiptCount { get; set; }
+        public DateTime? FirstDate { get; set; }
+        public DateTime? LastDate { get; set; }
+    }
+
+    private class CustomerTimeseriesPointDto
+    {
+        public string Label { get; set; } = string.Empty;
+        public DateTime PeriodStart { get; set; }
+        public float TotalWeightKg { get; set; }
+    }
+
+    private class CustomerDashboardDto
+    {
+        public CustomerSummaryDto Summary { get; set; } = new();
+        public List<CustomerTimeseriesPointDto> Timeseries { get; set; } = new();
+    }
+}

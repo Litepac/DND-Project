@@ -1,0 +1,97 @@
+@page "/stena-data"
+@inject HttpClient Http
+
+<h3>Stena – data browser</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Tabel</label>
+        <select class="form-select" @bind="selectedTable">
+            <option value="modtagelse">Modtagelse</option>
+            <option value="koerselsordrer">Kørselsordrer</option>
+            <option value="kapacitet">Kapacitet_og_enhed_opdateret</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Antal rækker</label>
+        <input type="number" class="form-control" @bind="top" min="1" max="5000" />
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-primary me-2" @onclick="LoadData">Hent data</button>
+        @if (isLoading)
+        {
+            <span><em>Loader...</em></span>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (preview is not null && preview.Rows.Count == 0)
+{
+    <div class="alert alert-info">Ingen rækker fundet.</div>
+}
+else if (preview is not null)
+{
+    <div class="table-responsive" style="max-height: 500px; overflow: auto;">
+        <table class="table table-sm table-striped">
+            <thead class="table-light">
+                <tr>
+                    @foreach (var col in preview.Columns)
+                    {
+                        <th>@col</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in preview.Rows)
+            {
+                <tr>
+                    @for (int i = 0; i < preview.Columns.Count; i++)
+                    {
+                        <td>@row[i]</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private string selectedTable = "modtagelse";
+    private int top = 50;
+    private bool isLoading;
+    private string? errorMessage;
+
+    private TablePreviewDto? preview;
+
+    private async Task LoadData()
+    {
+        errorMessage = null;
+        preview = null;
+        isLoading = true;
+
+        try
+        {
+            var url = $"api/stena/preview/{selectedTable}?top={top}";
+            preview = await Http.GetFromJsonAsync<TablePreviewDto>(url);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private class TablePreviewDto
+    {
+        public List<string> Columns { get; set; } = new();
+        public List<List<string?>> Rows { get; set; } = new();
+    }
+}

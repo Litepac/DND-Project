@@ -1,44 +1,29 @@
+// Models/StenaReceipt.cs
+using System;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace DNDProject.Api.Models
 {
-    public enum StenaReceiptKind
-    {
-        Unknown = 0,
-        Weight = 1,        // Enhed = KG
-        Emptying = 2       // Enhed = STK (tømning)
-    }
+// Models/StenaReceipt.cs
+[Table("Modtagelse")]
+public class StenaReceipt
+{
+    public int Id { get; set; }
 
-    public class StenaReceipt
-    {
-        public int Id { get; set; }
+    // LevNr i databasen (int)
+    public int? CustomerKey { get; set; }
 
-        // hvornår det skete (hvis vi kunne læse det)
-        public DateTime? Date { get; set; }
+    // Navn i databasen
+    public string CustomerName { get; set; } = string.Empty;
 
-        // varenummer, fx 710100 / 832495
-        public string? ItemNumber { get; set; }
+    public DateTime ReceiptDate { get; set; }   // KoeresDato
 
-        // “Småt brændbart affald”, “Tømning 1100L minicontainer”, ...
-        public string? ItemName { get; set; }
+    public string ItemNumber { get; set; } = string.Empty;   // Varenummer
+    public string ItemText   { get; set; } = string.Empty;   // Varebeskrivelse
 
-        // KG / STK
-        public string? Unit { get; set; }
+    public string Unit   { get; set; } = string.Empty;       // Enhed
+    public string Amount { get; set; } = string.Empty;       // Antal (nvarchar)
+}
 
-        // selve tallet fra "Antal"
-        public double? Amount { get; set; }
 
-        // EAK kode hvis vi fandt den
-        public string? EakCode { get; set; }
-
-        // hvilken type vi har udledt (weight vs emptying)
-        public StenaReceiptKind Kind { get; set; }
-
-        // for Emptying: “1100L”, “16m3”, “minicontainer” – udledt fra teksten
-        public string? ContainerTypeText { get; set; }
-
-        // vi gemmer hvilket Excel det kom fra
-        public string? SourceFile { get; set; }
-
-        // hvis der en dag kommer container-id i filen
-        public string? RawContainer { get; set; }
-    }
 }
