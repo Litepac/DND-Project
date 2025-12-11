@@ -68,7 +68,7 @@ Der mangler dog stadig at blive tilføjet rigtige grafer og bedre interaktivitet
 
 # Logbog – Uge 50
 
-I uge 50 blev der arbejdet intensivt på at etablere fundamentet for Stena-delen af DND-projektet. Fokus var på at få API’et korrekt koblet til databasen, forstå datagrundlaget og begynde opbygningen af et kunde-dashboard.
+I uge 50 blev der arbejdet intensivt på at etablere fundamentet for Stena-delen af projektet. Fokus var på at få API’et korrekt koblet til databasen, forstå datagrundlaget og begynde opbygningen af et kunde-dashboard.
 
 ## Databaseforbindelse og struktur
 
