@@ -1,29 +1,33 @@
-// Models/StenaReceipt.cs
 using System;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DNDProject.Api.Models
 {
-// Models/StenaReceipt.cs
-[Table("Modtagelse")]
-public class StenaReceipt
-{
-    public int Id { get; set; }
+    // Mappes til tabellen dbo.Modtagelse
+    [Table("Modtagelse")]
+    public class StenaReceipt
+    {
+        public int Id { get; set; }
 
-    // LevNr i databasen (int)
-    public int? CustomerKey { get; set; }
+        // LevNr i databasen — KAN være NULL → derfor int?
+        public int? CustomerKey { get; set; }
 
-    // Navn i databasen
-    public string CustomerName { get; set; } = string.Empty;
+        // Navn i databasen (Navn) — KAN være NULL → derfor string?
+        public string? CustomerName { get; set; }
 
-    public DateTime ReceiptDate { get; set; }   // KoeresDato
+        // KoeresDato — i databasen er den ALTID sat (datetime)
+        public DateTime ReceiptDate { get; set; }
 
-    public string ItemNumber { get; set; } = string.Empty;   // Varenummer
-    public string ItemText   { get; set; } = string.Empty;   // Varebeskrivelse
+        // Varenummer — nvarchar, kan være NULL → derfor string?
+        public string? ItemNumber { get; set; }
 
-    public string Unit   { get; set; } = string.Empty;       // Enhed
-    public string Amount { get; set; } = string.Empty;       // Antal (nvarchar)
-}
+        // Varebeskrivelse — nvarchar, kan være NULL → derfor string?
+        public string? ItemText { get; set; }
 
+        // Enhed (STK, KG, osv.) — KAN være NULL → string?
+        public string? Unit { get; set; }
 
+        // Antal — ligger som NVARCHAR → string? (vi parser senere)
+        public string? Amount { get; set; }
+    }
 }
