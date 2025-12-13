@@ -16,6 +16,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.ML" />
+    <PackageReference Include="Microsoft.ML.FastTree" />
     <PackageReference Include="Microsoft.ML.TensorFlow" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
