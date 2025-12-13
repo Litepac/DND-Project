@@ -65,7 +65,7 @@ public record Recommendation(
     string Note
 );
 
-public static class Program
+public static class MLTrainingRunner
 {
     // === Business constants ===
     const double DensityKgPerL = 0.13; // restaffald (kg/L)

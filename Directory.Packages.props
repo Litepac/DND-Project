@@ -17,8 +17,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
     <!-- Swagger -->
-    <PackageVersion Include="Microsoft.ML" Version="4.0.2" />
-    <PackageVersion Include="Microsoft.ML.FastTree" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.ML" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.ML.FastTree" Version="4.0.2" />
     <PackageVersion Include="Microsoft.ML.TensorFlow" Version="4.0.2" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
