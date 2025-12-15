@@ -1,7 +1,16 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">DNDProject.Web</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using DNDProject.Web.Auth
+@inject AuthenticationStateProvider Auth
+@inject JwtAuthStateProvider AuthState
+@inject NavigationManager Nav
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid d-flex align-items-center gap-2">
+        <img src="images/stena-logo.png" alt="Stena" style="height:28px;" />
+        <span class="navbar-brand mb-0" style="font-weight:700;">Stena Smart Collection</span>
+
+        <button title="Navigation menu" class="navbar-toggler ms-auto" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
     </div>
@@ -10,19 +19,18 @@
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="nav flex-column">
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
-            </NavLink>
-        </div>
+        @if (!string.IsNullOrWhiteSpace(email))
+        {
+            <div class="px-3 py-3" style="color: rgba(255,255,255,.85); border-bottom: 1px solid rgba(255,255,255,.12);">
+                <div style="font-size:.9rem; font-weight:600;">@email</div>
+                @if (roles?.Count > 0)
+                {
+                    <div style="font-size:.8rem; opacity:.8;">@string.Join(" • ", roles)</div>
+                }
+            </div>
+        }
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="stena">
-                <span class="bi bi-bar-chart-line" aria-hidden="true"></span> Stena
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
+        <div class="nav-item px-3 pt-2">
             <NavLink class="nav-link" href="customer-dashboard">
                 <span class="bi bi-graph-up" aria-hidden="true"></span> Kunde-dashboard
             </NavLink>
@@ -34,10 +42,10 @@
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="login" Match="NavLinkMatch.All">
-                <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Login
-            </NavLink>
+        <div class="nav-item px-3 mt-3">
+            <button type="button" class="btn btn-outline-light w-100" @onclick="Logout">
+                <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Log ud
+            </button>
         </div>
 
     </nav>
@@ -47,4 +55,38 @@
     private bool collapseNavMenu = true;
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+
+    string? email;
+    List<string> roles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserInfoAsync();
+
+        Auth.AuthenticationStateChanged += async task =>
+        {
+            await LoadUserInfoAsync(task);
+            await InvokeAsync(StateHasChanged);
+        };
+    }
+
+    private async Task LoadUserInfoAsync(Task<AuthenticationState>? task = null)
+    {
+        var state = task is null ? await Auth.GetAuthenticationStateAsync() : await task;
+        var user = state.User;
+
+        email = user?.Identity?.Name;
+
+        roles = user?.Claims
+            .Where(c => c.Type == ClaimTypes.Role)
+            .Select(c => c.Value)
+            .Distinct()
+            .ToList() ?? new List<string>();
+    }
+
+    private async Task Logout()
+    {
+        await AuthState.MarkUserAsLoggedOutAsync();
+        Nav.NavigateTo("/login", replace: true);
+    }
 }

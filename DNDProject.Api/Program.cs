@@ -1,23 +1,37 @@
+using System.Security.Claims;
+using System.Text;
 using DNDProject.Api.Data;
 using DNDProject.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
-using Microsoft.IdentityModel.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// EF Core + SQL Server  👈 ændret fra SQLite
-builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// --------------------
+// DbContexts
+// --------------------
 
+// Stena/domain DB (INGEN Identity-tabeller her)
+builder.Services.AddDbContext<AppDbContext>(o =>
+    o.UseSqlServer(builder.Configuration.GetConnectionString("StenaConnection")));
+
+// Auth/Identity DB (AspNetUsers/AspNetRoles osv.)
+builder.Services.AddDbContext<AuthDbContext>(o =>
+    o.UseSqlServer(builder.Configuration.GetConnectionString("AuthConnection")));
+
+// --------------------
 // Controllers
+// --------------------
 builder.Services.AddControllers();
 
+// --------------------
 // CORS (åben i dev)
+// --------------------
 builder.Services.AddCors(opt =>
 {
     opt.AddDefaultPolicy(p => p
@@ -26,7 +40,9 @@ builder.Services.AddCors(opt =>
         .AllowAnyMethod());
 });
 
+// --------------------
 // Swagger + JWT-knap
+// --------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -46,6 +62,7 @@ builder.Services.AddSwaggerGen(c =>
             Id = "Bearer"
         }
     };
+
     c.AddSecurityDefinition("Bearer", securityScheme);
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -53,7 +70,9 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Identity
+// --------------------
+// Identity (på AuthDbContext)
+// --------------------
 builder.Services
     .AddIdentityCore<ApplicationUser>(opt =>
     {
@@ -63,107 +82,89 @@ builder.Services
         opt.Password.RequireNonAlphanumeric = false;
     })
     .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<AppDbContext>()
+    .AddEntityFrameworkStores<AuthDbContext>()
     .AddSignInManager();
 
-// JWT config (midlertidigt: kun signaturvalidering)
+// --------------------
+// JWT
+// --------------------
 var jwt = builder.Configuration.GetSection("Jwt");
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
 
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(opt =>
     {
-        // Vis detaljerede fejl (KUN i udvikling)
-        IdentityModelEventSource.ShowPII = true;
+        if (builder.Environment.IsDevelopment())
+            IdentityModelEventSource.ShowPII = true;
 
         opt.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
-            IssuerSigningKey = key
-        };
+            IssuerSigningKey = key,
 
-        // Ekstra log – viser præcis hvad der kommer ind,
-        // trimmer evt. tegn og logger fejlbeskeden.
-        opt.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = ctx =>
-            {
-                var logger = ctx.HttpContext.RequestServices
-                               .GetRequiredService<ILoggerFactory>()
-                               .CreateLogger("JWT");
-
-                var rawAuth = ctx.Request.Headers["Authorization"].ToString();
-                logger.LogInformation("Authorization header modtaget: {auth}", rawAuth);
-
-                // Trim "Bearer " + evt. anførselstegn/whitespace
-                if (!string.IsNullOrWhiteSpace(rawAuth) &&
-                    rawAuth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                {
-                    ctx.Token = rawAuth.Substring("Bearer ".Length).Trim().Trim('"');
-                }
-
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = ctx =>
-            {
-                var logger = ctx.HttpContext.RequestServices
-                               .GetRequiredService<ILoggerFactory>()
-                               .CreateLogger("JWT");
-
-                logger.LogError(ctx.Exception, "JWT authentication failed: {msg}", ctx.Exception.Message);
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = ctx =>
-            {
-                var logger = ctx.HttpContext.RequestServices
-                               .GetRequiredService<ILoggerFactory>()
-                               .CreateLogger("JWT");
-
-                logger.LogInformation("JWT token er valideret for {sub}",
-                    ctx.Principal?.Identity?.Name);
-                return Task.CompletedTask;
-            }
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
         };
     });
 
-builder.Services.AddAuthorization();
+// --------------------
+// Authorization: ALT kræver login (undtagen [AllowAnonymous])
+// --------------------
+builder.Services.AddAuthorization(o =>
+{
+    o.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var app = builder.Build();
 
+// --------------------
+// Pipeline
+// --------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true; // kun i dev
+    IdentityModelEventSource.ShowPII = true;
 }
 
 app.UseCors();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// --- Seeding & migrations i et scope ---
+// --------------------
+// Auth DB migrations + seeding (DEV)
+// --------------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var env = services.GetRequiredService<IWebHostEnvironment>();
-    var db  = services.GetRequiredService<AppDbContext>();
 
-    // Vi kører ikke EF-migrationer mod Stena-databasen
-    // await db.Database.MigrateAsync();
+    // KUN Auth DB migreres (rører ikke Stena DB)
+    var authDb = services.GetRequiredService<AuthDbContext>();
+    await authDb.Database.MigrateAsync();
 
-    // Midlertidigt: slå Identity seeding fra, fordi der ikke findes en Customers-tabel i Stena-DB
-    // if (env.IsDevelopment())
-    //     await IdentitySeed.SeedAsync(app.Services);
-
-    //----- await StenaDataSeed.SeedAsync(app.Services);
+    if (env.IsDevelopment())
+    {
+        await IdentitySeed.SeedAuthAsync(app.Services);
+    }
 }
-
 
 app.Run();

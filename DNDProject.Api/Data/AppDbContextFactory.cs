@@ -1,16 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace DNDProject.Api.Data;
 
-public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+public sealed class AuthDbContextFactory : IDesignTimeDbContextFactory<AuthDbContext>
 {
-    public AppDbContext CreateDbContext(string[] args)
+    public AuthDbContext CreateDbContext(string[] args)
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite("Data Source=app.db") // samme som i appsettings.json
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var cs = config.GetConnectionString("AuthConnection")
+                 ?? throw new InvalidOperationException("Missing ConnectionStrings:AuthConnection");
+
+        var options = new DbContextOptionsBuilder<AuthDbContext>()
+            .UseSqlServer(cs)
             .Options;
 
-        return new AppDbContext(options);
+        return new AuthDbContext(options);
     }
 }

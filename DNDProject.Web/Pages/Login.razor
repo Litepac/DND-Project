@@ -1,11 +1,12 @@
 @page "/login"
 @using System.Net.Http.Json
+@using DNDProject.Web.Auth
 @inject HttpClient Http
-@inject DNDProject.Web.Services.ITokenStorage Tokens
+@inject JwtAuthStateProvider AuthState
+@inject NavigationManager Nav
 
 <h3>Login</h3>
 
-@if (ok) { <div class="alert alert-success">Login OK – token gemt.</div> }
 @if (!string.IsNullOrWhiteSpace(error))
 {
     <div class="alert alert-danger">@error</div>
@@ -26,23 +27,13 @@
     </div>
 
     <button class="btn btn-primary" disabled="@busy">Log ind</button>
-    <button type="button" class="btn btn-outline-secondary ms-2" @onclick="Logout">Log ud</button>
+    <button type="button" class="btn btn-outline-secondary ms-2" @onclick="Logout" disabled="@busy">Log ud</button>
 </EditForm>
 
-@if (!string.IsNullOrWhiteSpace(currentToken))
-{
-    <details class="mt-3">
-        <summary>Token</summary>
-        <textarea class="form-control" rows="4" readonly>@currentToken</textarea>
-    </details>
-}
-
 @code {
-    bool busy, ok;
+    bool busy;
     string? error;
-    string? currentToken;
 
-    // simple model
     LoginRequest model = new() { Email = "admin@demo.local", Password = "Pass123!" };
 
     class LoginRequest
@@ -51,15 +42,13 @@
         public string Password { get; set; } = "";
     }
 
-    // svar fra API
     record LoginResponse(string Token, DateTime Expires, string Email, IEnumerable<string> Roles, int? CustomerId);
-
-    protected override async Task OnInitializedAsync()
-        => currentToken = await Tokens.GetAsync();
 
     async Task HandleLogin()
     {
-        error = null; ok = false; busy = true;
+        error = null;
+        busy = true;
+
         try
         {
             var resp = await Http.PostAsJsonAsync("api/auth/login", model);
@@ -70,27 +59,31 @@
             }
 
             var dto = await resp.Content.ReadFromJsonAsync<LoginResponse>();
-            if (dto is null)
+            if (dto is null || string.IsNullOrWhiteSpace(dto.Token))
             {
-                error = "Kunne ikke læse svar fra serveren.";
+                error = "Kunne ikke læse token fra serveren.";
                 return;
             }
 
-            await Tokens.SaveAsync(dto.Token);
-            currentToken = dto.Token;
-            ok = true;
+            // Gem token + opdater Blazor auth-state
+            await AuthState.MarkUserAsAuthenticatedAsync(dto.Token);
+
+            // Gå til home efter login (kræver @page "/stena" i StenaDashboard.razor)
+            Nav.NavigateTo("/container-efficiency", replace: true);
         }
         catch (Exception ex)
         {
             error = ex.Message;
         }
-        finally { busy = false; }
+        finally
+        {
+            busy = false;
+        }
     }
 
     async Task Logout()
     {
-        await Tokens.ClearAsync();
-        currentToken = null;
-        ok = false;
+        await AuthState.MarkUserAsLoggedOutAsync();
+        Nav.NavigateTo("/login", replace: true);
     }
 }

@@ -1,16 +1,75 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider Auth
+@inject NavigationManager Nav
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+@code {
+    bool isAuthed;
+    bool isLoginRoute;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAuthAsync();
+
+        Auth.AuthenticationStateChanged += async task =>
+        {
+            await RefreshAuthAsync(task);
+            await InvokeAsync(StateHasChanged);
+        };
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        isLoginRoute = path.Equals("/login", StringComparison.OrdinalIgnoreCase);
+
+        var state = await Auth.GetAuthenticationStateAsync();
+        isAuthed = state.User?.Identity?.IsAuthenticated ?? false;
+    }
+
+    async Task RefreshAuthAsync(Task<AuthenticationState>? task = null)
+    {
+        var state = task is null ? await Auth.GetAuthenticationStateAsync() : await task;
+        isAuthed = state.User?.Identity?.IsAuthenticated ?? false;
+
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        isLoginRoute = path.Equals("/login", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+@if (!isAuthed || isLoginRoute)
+{
+    <div style="min-height:100vh; background:#f6f8fb;">
+        <div style="background:white; border-bottom:1px solid #e5e7eb;">
+            <div style="max-width:900px; margin:0 auto; padding:16px; display:flex; align-items:center; gap:12px;">
+                <img src="images/stena-logo.png" alt="Stena Recycling" style="height:44px;" />
+                <div>
+                    <div style="font-weight:700;">Stena Smart Collection</div>
+                    <div style="color:#6b7280; font-size:0.9rem;">Log ind for at fortsætte</div>
+                </div>
+            </div>
         </div>
 
-        <article class="content px-4">
+        <div style="max-width:520px; margin:40px auto; padding:0 16px;">
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-4">
+                <a href="about" target="_blank">About</a>
+            </div>
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+}

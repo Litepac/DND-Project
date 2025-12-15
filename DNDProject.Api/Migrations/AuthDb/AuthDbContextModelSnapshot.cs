@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DNDProject.Api.Migrations
+namespace DNDProject.Api.Migrations.AuthDb
 {
-    [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(AuthDbContext))]
+    partial class AuthDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -88,218 +88,6 @@ namespace DNDProject.Api.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.Container", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<float?>("LastFillPct")
-                        .HasColumnType("real");
-
-                    b.Property<DateTime?>("LastPickupDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Material")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("PreferredPickupFrequencyDays")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SizeLiters")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<float>("WeeklyAmountKg")
-                        .HasColumnType("real");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("Containers");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.ContainerCapacity", b =>
-                {
-                    b.Property<int>("ItemNumber")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("Varenummer");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ItemNumber"));
-
-                    b.Property<double?>("Capacity")
-                        .HasColumnType("float")
-                        .HasColumnName("Kapacitet");
-
-                    b.Property<string>("Unit")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Enhed");
-
-                    b.HasKey("ItemNumber");
-
-                    b.ToTable("Kapacitet_og_enhed_opdateret", "dbo");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.Customer", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Address")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Customers");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.PickupEvent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<double?>("Co2Kg")
-                        .HasColumnType("float");
-
-                    b.Property<int>("ContainerId")
-                        .HasColumnType("int");
-
-                    b.Property<double?>("DistanceKm")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("FillPct")
-                        .HasColumnType("float");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("datetime2");
-
-                    b.Property<double?>("WeightKg")
-                        .HasColumnType("float");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ContainerId");
-
-                    b.ToTable("PickupEvents");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.StenaKoerselsordre", b =>
-                {
-                    b.Property<string>("Nr")
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("Nr");
-
-                    b.Property<string>("Beskrivelse")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Beskrivelse");
-
-                    b.Property<string>("Frekvens")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Frekvens");
-
-                    b.Property<int?>("Indhold")
-                        .HasColumnType("int")
-                        .HasColumnName("Indhold");
-
-                    b.Property<string>("Indholdsbeskrivelse")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Indholdsbeskrivelse");
-
-                    b.Property<int?>("Lev_nr")
-                        .HasColumnType("int")
-                        .HasColumnName("Lev_nr");
-
-                    b.Property<string>("Navn")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Navn");
-
-                    b.Property<int?>("PurchaseOrderNumber")
-                        .HasColumnType("int")
-                        .HasColumnName("Købsordrenr");
-
-                    b.Property<DateTime?>("Start_dato")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("Start_dato");
-
-                    b.Property<string>("Uge_dag")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Uge_dag");
-
-                    b.Property<int?>("Varenr")
-                        .HasColumnType("int")
-                        .HasColumnName("Varenr");
-
-                    b.HasKey("Nr");
-
-                    b.ToTable("Kørselsordrer", "dbo");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.StenaReceipt", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("Id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Amount")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Antal");
-
-                    b.Property<int?>("CustomerKey")
-                        .HasColumnType("int")
-                        .HasColumnName("LevNr");
-
-                    b.Property<string>("CustomerName")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Navn");
-
-                    b.Property<string>("ItemNumber")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Varenummer");
-
-                    b.Property<string>("ItemText")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Varebeskrivelse");
-
-                    b.Property<int?>("PurchaseOrderNumber")
-                        .HasColumnType("int")
-                        .HasColumnName("KoebsordreNummer");
-
-                    b.Property<DateTime>("ReceiptDate")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("KoeresDato");
-
-                    b.Property<string>("Unit")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("Enhed");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Modtagelse", "dbo");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -435,24 +223,6 @@ namespace DNDProject.Api.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("DNDProject.Api.Models.Container", b =>
-                {
-                    b.HasOne("DNDProject.Api.Models.Customer", null)
-                        .WithMany("Containers")
-                        .HasForeignKey("CustomerId");
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.PickupEvent", b =>
-                {
-                    b.HasOne("DNDProject.Api.Models.Container", "Container")
-                        .WithMany()
-                        .HasForeignKey("ContainerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Container");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -502,11 +272,6 @@ namespace DNDProject.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("DNDProject.Api.Models.Customer", b =>
-                {
-                    b.Navigation("Containers");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,67 +1,76 @@
-using System.Security.Claims;
 using DNDProject.Api.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DNDProject.Api.Data;
 
 public static class IdentitySeed
 {
-    public static async Task SeedAsync(IServiceProvider services)
+    public static async Task SeedAuthAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
 
-        var db      = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-        if (!await db.Customers.AnyAsync(c => c.Id == 1))
-        {
-            db.Customers.Add(new Customer { Id = 1, Name = "Demo-kunde" });
-            await db.SaveChangesAsync();
-        }
-
-        // Roller
-        string[] roles = { "Employee", "Customer" };
+        // Roles
+        string[] roles = { "Admin", "Sales" };
         foreach (var r in roles)
         {
             if (!await roleMgr.RoleExistsAsync(r))
                 await roleMgr.CreateAsync(new IdentityRole(r));
         }
 
-        // Employee/admin
-        var adminEmail = "admin@demo.local";
-        var admin = await userMgr.FindByEmailAsync(adminEmail);
-        if (admin is null)
+        // Admin
+        await EnsureUserAsync(
+            userMgr,
+            email: "admin@stena",
+            password: "admin123",
+            roles: new[] { "Admin" });
+
+        // Sales
+        await EnsureUserAsync(
+            userMgr,
+            email: "sales@stena",
+            password: "sales123",
+            roles: new[] { "Sales" });
+
+        // Ralleboy (kan alt)
+        await EnsureUserAsync(
+            userMgr,
+            email: "ralleboy@gud",
+            password: "gud123",
+            roles: new[] { "Admin", "Sales" });
+    }
+
+    private static async Task EnsureUserAsync(
+        UserManager<ApplicationUser> userMgr,
+        string email,
+        string password,
+        IEnumerable<string> roles)
+    {
+        var user = await userMgr.FindByEmailAsync(email);
+        if (user is null)
         {
-            admin = new ApplicationUser
+            user = new ApplicationUser
             {
-                UserName = adminEmail,
-                Email = adminEmail,
+                UserName = email,
+                Email = email,
                 EmailConfirmed = true
             };
-            await userMgr.CreateAsync(admin, "Pass123!");
-            await userMgr.AddToRoleAsync(admin, "Employee");
+
+            var created = await userMgr.CreateAsync(user, password);
+            if (!created.Succeeded)
+            {
+                var msg = string.Join("; ", created.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Could not create user {email}: {msg}");
+            }
         }
 
-        // Customer (koblet til CustomerId = 1)
-        var custEmail = "customer@demo.local";
-        var customerUser = await userMgr.FindByEmailAsync(custEmail);
-        if (customerUser is null)
+        foreach (var role in roles)
         {
-            customerUser = new ApplicationUser
-            {
-                UserName = custEmail,
-                Email = custEmail,
-                EmailConfirmed = true,
-                CustomerId = 1
-            };
-            await userMgr.CreateAsync(customerUser, "Pass123!");
-            await userMgr.AddToRoleAsync(customerUser, "Customer");
-
-            // Claim så vi kan filtrere “mine data” senere
-            await userMgr.AddClaimAsync(customerUser, new Claim("customerId", "1"));
+            if (!await userMgr.IsInRoleAsync(user, role))
+                await userMgr.AddToRoleAsync(user, role);
         }
     }
 }

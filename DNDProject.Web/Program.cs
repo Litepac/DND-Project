@@ -1,5 +1,6 @@
 using System.Net.Http;
 using DNDProject.Web;
+using DNDProject.Web.Auth;
 using DNDProject.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -17,11 +18,18 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<ITokenStorage, TokenStorage>();
 builder.Services.AddScoped<TokenAuthorizationMessageHandler>();
 
+// 🔑 Auth state provider (registrer som konkret type + som base type)
+builder.Services.AddScoped<JwtAuthStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<JwtAuthStateProvider>());
+
 // Læs API-baseadresse fra config
 var apiBaseAddress =
     builder.Configuration["Api:BaseAddress"] ??
     Environment.GetEnvironmentVariable("Api__BaseAddress") ??
-    "http://localhost:5230";
+    "http://localhost:5230/";
+
+if (!apiBaseAddress.EndsWith("/"))
+    apiBaseAddress += "/";
 
 // Navngiven HttpClient til API'et
 builder.Services.AddHttpClient("Api", client =>
@@ -34,7 +42,7 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
-// 👉 her registrerer vi StenaService, nu hvor HttpClient findes
+// Services
 builder.Services.AddScoped<StenaService>();
 
 await builder.Build().RunAsync();
