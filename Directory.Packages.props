@@ -21,9 +21,13 @@
 
 
     <!-- Swagger -->
-    <PackageVersion Include="Microsoft.ML" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.ML.FastTree" Version="4.0.2" />
     <PackageVersion Include="Microsoft.ML.TensorFlow" Version="4.0.2" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+
+    <!-- ML -->
+    <PackageVersion Include="Microsoft.ML" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.ML.FastTree" Version="5.0.0" />
+
+
   </ItemGroup>
 </Project>

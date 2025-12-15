@@ -17,5 +17,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.ML.TensorFlow" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+<PackageReference Include="Microsoft.ML" />
+<PackageReference Include="Microsoft.ML.FastTree" />
+
   </ItemGroup>
 </Project>
