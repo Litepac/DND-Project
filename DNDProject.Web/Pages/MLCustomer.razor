@@ -19,24 +19,205 @@ else if (busy)
 }
 else if (rec is not null)
 {
-    <div class="card" style="max-width:720px;">
-        <div class="card-body">
-            <h5 class="card-title mb-1">@rec.CustomerName</h5>
-            <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
+    <div class="d-flex flex-column gap-3" style="max-width: 900px;">
 
-            <dl class="row mb-0">
-                <dt class="col-sm-5">Container</dt>
-                <dd class="col-sm-7">@rec.ContainerCount × @rec.ContainerL L</dd>
+        <!-- Recommendation card -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-1">@rec.CustomerName</h5>
+                <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
 
-                <dt class="col-sm-5">Frekvens</dt>
-                <dd class="col-sm-7">Hver @rec.FrequencyDays dage</dd>
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Container</dt>
+                    <dd class="col-sm-7">@rec.ContainerCount × @rec.ContainerL L</dd>
 
-                <dt class="col-sm-5">Expected fill</dt>
-                <dd class="col-sm-7">@rec.ExpectedFill.ToString("P0")</dd>
+                    <dt class="col-sm-5">Frekvens</dt>
+                    <dd class="col-sm-7">Hver @rec.FrequencyDays dage</dd>
 
-                <dt class="col-sm-5">Pred kg/dag (safe)</dt>
-                <dd class="col-sm-7">@rec.PredKgPerDaySafe.ToString("N0")</dd>
-            </dl>
+                    <dt class="col-sm-5">Expected fill</dt>
+                    <dd class="col-sm-7">@rec.ExpectedFill.ToString("P0")</dd>
+
+                    <dt class="col-sm-5">Pred kg/dag (safe)</dt>
+                    <dd class="col-sm-7">@rec.PredKgPerDaySafe.ToString("N0")</dd>
+                </dl>
+
+                <hr />
+
+                <div class="small text-muted">
+                    <div><strong>Container:</strong> foreslået antal × nominelt volumen (L) for restaffald.</div>
+                    <div><strong>Frekvens:</strong> foreslået antal dage mellem tømninger.</div>
+                    <div><strong>Expected fill:</strong> estimeret fyldningsgrad ved tømning (volumen-baseret antagelse).</div>
+                    <div><strong>Pred kg/dag (safe):</strong> konservativt estimat for gennemsnitlig kg pr. dag baseret på historik/model.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESG / CO2 / Cost impact -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-2">Business & ESG impact (estimat)</h5>
+                <div class="text-muted mb-3">
+                    Viser potentiale ved at følge anbefalingen. Tallene afhænger af antagelser (kan justeres her).
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">Km pr. tur (antagelse)</label>
+                        <input class="form-control"
+                               type="number"
+                               step="1"
+                               min="0"
+                               @bind="kmPerTrip"
+                               @bind:event="oninput" />
+                        <div class="form-text">Brug fx gennemsnitlig rute tur/retur.</div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">CO₂ pr. km (kg/km)</label>
+                        <input class="form-control"
+                               type="number"
+                               step="0.1"
+                               min="0"
+                               @bind="kgCo2PerKm"
+                               @bind:event="oninput" />
+                        <div class="form-text">Afhænger af biltype/last. Brug et konservativt tal.</div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">Omkostning pr. tur (kr)</label>
+                        <input class="form-control"
+                               type="number"
+                               step="10"
+                               min="0"
+                               @bind="costPerTrip"
+                               @bind:event="oninput" />
+                        <div class="form-text">Internt estimat (chauffør, bil, planlægning, mv.).</div>
+                    </div>
+                </div>
+
+                <hr />
+
+                @{
+                    var tripsPerYearNew = TripsPerYear(rec.FrequencyDays);
+                    // Hvis I senere får baseline-frekvens fra data: sæt baselineFrequencyDays != null,
+                    // så vises også baseline og “savings”.
+                    var tripsPerYearBase = baselineFrequencyDays is null ? (double?)null : TripsPerYear(baselineFrequencyDays.Value);
+
+                    var deltaTrips = (tripsPerYearBase is null) ? (double?)null : (tripsPerYearBase.Value - tripsPerYearNew);
+
+                    var co2New = tripsPerYearNew * kmPerTrip * kgCo2PerKm;
+                    var co2Saved = (deltaTrips is null) ? (double?)null : deltaTrips.Value * kmPerTrip * kgCo2PerKm;
+
+                    var costNew = tripsPerYearNew * costPerTrip;
+                    var costSaved = (deltaTrips is null) ? (double?)null : deltaTrips.Value * costPerTrip;
+
+                    // Volume-based sanity indicators (scope: residual waste)
+                    var dailyLiters = (rec.PredKgPerDaySafe / BulkDensityKgPerLiter); // L/day
+                    var capacityLiters = rec.ContainerCount * rec.ContainerL;         // L total capacity in setup
+                    var litersPerPickup = dailyLiters * rec.FrequencyDays;
+                    var fillRatio = capacityLiters > 0 ? (litersPerPickup / capacityLiters) : 0;
+                }
+
+                <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="p-3 border rounded">
+                            <div class="fw-semibold mb-2">Operationelt</div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>Forventede ture/år (anbefalet)</span>
+                                <span class="fw-semibold">@tripsPerYearNew.ToString("N0")</span>
+                            </div>
+
+                            @if (tripsPerYearBase is not null)
+                            {
+                                <div class="d-flex justify-content-between">
+                                    <span>Forventede ture/år (baseline)</span>
+                                    <span class="fw-semibold">@tripsPerYearBase.Value.ToString("N0")</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Potentielt færre ture/år</span>
+                                    <span class="fw-semibold">@deltaTrips!.Value.ToString("N0")</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="small text-muted mt-2">
+                                    Baseline (nuværende frekvens) er ikke beregnet endnu i UI – vi viser derfor kun anbefalet niveau.
+                                    (Hvis I vil, kan vi senere hente baseline fra historiske tømninger og vise “før/efter”.)
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <div class="p-3 border rounded">
+                            <div class="fw-semibold mb-2">ESG (CO₂) & økonomi</div>
+
+                            <div class="d-flex justify-content-between">
+                                <span>CO₂/år (anbefalet)</span>
+                                <span class="fw-semibold">@co2New.ToString("N0") kg</span>
+                            </div>
+
+                            @if (co2Saved is not null)
+                            {
+                                <div class="d-flex justify-content-between">
+                                    <span>Potentiel CO₂-besparelse/år</span>
+                                    <span class="fw-semibold">@co2Saved.Value.ToString("N0") kg</span>
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between mt-2">
+                                <span>Omkostning/år (anbefalet)</span>
+                                <span class="fw-semibold">@costNew.ToString("N0") kr</span>
+                            </div>
+
+                            @if (costSaved is not null)
+                            {
+                                <div class="d-flex justify-content-between">
+                                    <span>Potentiel besparelse/år</span>
+                                    <span class="fw-semibold">@costSaved.Value.ToString("N0") kr</span>
+                                </div>
+                            }
+
+                            <div class="small text-muted mt-2">
+                                Estimatet fokuserer på transport/indsamling (Scope 1/3 afhænger af jeres ESG-ramme).
+                                Kan bruges direkte i business case som “potentiale”.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="p-3 border rounded">
+                            <div class="fw-semibold mb-2">Sanity-check (restaffald, volumen-antagelse)</div>
+
+                            <div class="row g-2">
+                                <div class="col-12 col-md-4">
+                                    <div class="text-muted small">Antaget densitet</div>
+                                    <div class="fw-semibold">@BulkDensityKgPerLiter.ToString("N2") kg/L</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <div class="text-muted small">Est. volumen pr. dag</div>
+                                    <div class="fw-semibold">@dailyLiters.ToString("N0") L/dag</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <div class="text-muted small">Est. fyldning pr. tømning</div>
+                                    <div class="fw-semibold">@fillRatio.ToString("P0")</div>
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mt-2">
+                                Dette er en hurtig plausibilitetscheck: (kg/dag → liter/dag) sammenholdt med containerkapacitet og frekvens.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optional: quick actions -->
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
+            <button class="btn btn-outline-primary" @onclick="Reload">Genindlæs</button>
         </div>
     </div>
 }
@@ -56,6 +237,17 @@ else
 
     RecommendationDto? rec;
 
+    // --- ESG / impact assumptions (can be tuned in UI) ---
+    double kmPerTrip = 20;      // default assumption
+    double kgCo2PerKm = 1.2;    // default assumption
+    double costPerTrip = 500;   // default assumption in DKK
+
+    // Bulk density for residual waste (your report assumption)
+    const double BulkDensityKgPerLiter = 0.13;
+
+    // Baseline frequency (optional: set later if you add endpoint / logic)
+    int? baselineFrequencyDays = null;
+
     public sealed record RecommendationDto(
         string CustomerNo,
         string CustomerName,
@@ -67,6 +259,9 @@ else
     );
 
     protected override async Task OnParametersSetAsync()
+        => await Load();
+
+    async Task Reload()
         => await Load();
 
     async Task Load()
@@ -86,7 +281,7 @@ else
 
             Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            // ✅ KORREKT: GET /api/ml/recommend-one
+            // GET /api/ml/recommend-one
             var url =
                 $"api/ml/recommend-one?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&customerNo={Uri.EscapeDataString(CustomerNo)}";
 
@@ -115,6 +310,12 @@ else
         {
             busy = false;
         }
+    }
+
+    static double TripsPerYear(int frequencyDays)
+    {
+        if (frequencyDays <= 0) return 0;
+        return 365.0 / frequencyDays;
     }
 
     void Back() => Nav.NavigateTo("/ml-customers");

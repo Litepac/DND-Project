@@ -7,76 +7,152 @@
 
 <h3>ML – Top kunder</h3>
 
-<div class="d-flex align-items-end gap-3 mb-3">
-    <div>
+<div class="row g-3 align-items-end mb-3">
+    <div class="col-auto">
         <label class="form-label">From</label>
-        <InputDate @bind-Value="from" class="form-control" />
+        <InputDate class="form-control" @bind-Value="from" />
     </div>
 
-    <div>
+    <div class="col-auto">
         <label class="form-label">To</label>
-        <InputDate @bind-Value="to" class="form-control" />
+        <InputDate class="form-control" @bind-Value="to" />
     </div>
 
-    <button class="btn btn-primary" @onclick="Load" disabled="@busy">
-        Hent
-    </button>
+    <div class="col-auto">
+        <label class="form-label">Vis antal</label>
+        <InputNumber class="form-control" @bind-Value="take" />
+    </div>
+
+    <div class="col-auto">
+        <button class="btn btn-primary" @onclick="Load" disabled="@busy">Hent</button>
+    </div>
+</div>
+
+<div class="row g-3 align-items-end mb-3">
+    <div class="col-md-6">
+        <label class="form-label">Søg (kundenr eller navn)</label>
+        <input class="form-control"
+               placeholder="fx 358924 eller Novo..."
+               value="@search"
+               @oninput="OnSearchInput" />
+        <div class="form-text">
+            Søg filtrerer direkte i listen. Klik en kunde for at se anbefaling.
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Sortér</label>
+<select class="form-select" @bind="sortBy">
+    <option value="TotalKgDesc">Total kg</option>
+    <option value="AvgKgPerDayDesc">Avg kg/dag</option>
+    <option value="DaysDesc">Dage</option>
+    <option value="LastDateDesc">Sidste dato</option>
+</select>
+
+    </div>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
     <div class="alert alert-danger">@error</div>
 }
-
-@if (busy)
+else if (busy)
 {
     <div>Henter...</div>
 }
-else if (data is not null)
+else if (rows is null)
 {
-    <div class="mb-2">
-        <strong>Periode:</strong> @data.From.ToString("yyyy-MM-dd") – @data.To.ToString("yyyy-MM-dd")
-        <span class="ms-2">(kunder: @data.Customers)</span>
+    <div class="text-muted">Tryk “Hent” for at hente top kunder.</div>
+}
+else
+{
+    <div class="mb-2 text-muted">
+        Periode: @from.ToString("yyyy-MM-dd") – @to.ToString("yyyy-MM-dd")
+        (kunder: @totalCustomers, vist: @rows.Count)
     </div>
 
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>Kundenr</th>
-                <th>Kundenavn</th>
-                <th class="text-end">Dage</th>
-                <th class="text-end">Total kg</th>
-                <th class="text-end">Avg kg/dag</th>
-                <th>Sidste dato</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var r in data.Top)
-            {
-                <tr style="cursor:pointer" @onclick="() => OpenCustomer(r.CustomerNo)">
-                    <td>@r.CustomerNo</td>
-                    <td>@r.CustomerName</td>
-                    <td class="text-end">@r.Days</td>
-                    <td class="text-end">@r.TotalKg.ToString("N0")</td>
-                    <td class="text-end">@r.AvgKgPerDay.ToString("N1")</td>
-                    <td>@r.LastDate.ToString("yyyy-MM-dd")</td>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Kundenr</th>
+                    <th>Kundenavn</th>
+                    <th class="text-end">Dage</th>
+                    <th class="text-end">Total kg</th>
+                    <th class="text-end">Avg kg/dag</th>
+                    <th class="text-end">Sidste dato</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var r in rows)
+                {
+                    <tr style="cursor:pointer" @onclick="@(() => OpenCustomer(r.CustomerNo))">
+                        <td>@r.CustomerNo</td>
+                        <td>@r.CustomerName</td>
+                        <td class="text-end">@r.Days</td>
+                        <td class="text-end">@r.TotalKg.ToString("N0")</td>
+                        <td class="text-end">@r.AvgKgPerDay.ToString("N1")</td>
+                        <td class="text-end">@r.LastDate.ToString("yyyy-MM-dd")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
     DateTime from = new(2024, 1, 1);
     DateTime to   = new(2024, 12, 31);
 
+    int take = 200;
+
+    string search = "";
+    CancellationTokenSource? _searchCts;
+
     bool busy;
     string? error;
 
-    CustomersResponse? data;
+    int totalCustomers;
+    List<CustomerTopRow>? rows;
 
-    public sealed record CustomersResponse(DateTime From, DateTime To, int Customers, List<CustomerRow> Top);
-    public sealed record CustomerRow(string CustomerNo, string CustomerName, int Days, double TotalKg, double AvgKgPerDay, DateTime LastDate);
+string _sortBy = "TotalKgDesc";
+string sortBy
+{
+    get => _sortBy;
+    set
+    {
+        if (_sortBy == value) return;
+        _sortBy = value;
+
+        if (rows is not null)
+            rows = ApplySort(rows);
+    }
+}
+
+
+    // DTOs matcher MLVizController output
+    public sealed record CustomerTopRow(
+        string CustomerNo,
+        string CustomerName,
+        int Days,
+        double TotalKg,
+        double AvgKgPerDay,
+        DateTime LastDate
+    );
+
+    public sealed record VizResponse(
+        DateTime From,
+        DateTime To,
+        int TotalCustomers,
+        int Returned,
+        List<CustomerTopRow> Top
+    );
+
+    protected override async Task OnInitializedAsync()
+    {
+        // optional: auto-load første gang
+        await Load();
+    }
 
     async Task Load()
     {
@@ -89,32 +165,43 @@ else if (data is not null)
             if (string.IsNullOrWhiteSpace(token))
             {
                 error = "Du er ikke logget ind (mangler token).";
+                rows = null;
                 return;
             }
 
-            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            Http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
 
-            var url = $"api/ml-viz/customers?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+            var url =
+                $"api/ml-viz/customers" +
+                $"?from={from:yyyy-MM-dd}" +
+                $"&to={to:yyyy-MM-dd}" +
+                $"&take={take}" +
+                $"&search={Uri.EscapeDataString(search ?? "")}";
+
             var resp = await Http.GetAsync(url);
-
             if (!resp.IsSuccessStatusCode)
             {
-                error = $"Kunne ikke hente data ({(int)resp.StatusCode})";
+                error = $"Kunne ikke hente top kunder ({(int)resp.StatusCode})";
+                rows = null;
                 return;
             }
 
-            var dto = await resp.Content.ReadFromJsonAsync<CustomersResponse>();
-            if (dto is null)
+            var data = await resp.Content.ReadFromJsonAsync<VizResponse>();
+            if (data is null)
             {
                 error = "Kunne ikke læse svar fra serveren.";
+                rows = null;
                 return;
             }
 
-            data = dto;
+            totalCustomers = data.TotalCustomers;
+            rows = ApplySort(data.Top);
         }
         catch (Exception ex)
         {
             error = ex.Message;
+            rows = null;
         }
         finally
         {
@@ -122,14 +209,38 @@ else if (data is not null)
         }
     }
 
+    List<CustomerTopRow> ApplySort(List<CustomerTopRow> list)
+        => sortBy switch
+        {
+            "AvgKgPerDayDesc" => list.OrderByDescending(x => x.AvgKgPerDay).ToList(),
+            "DaysDesc"        => list.OrderByDescending(x => x.Days).ToList(),
+            "LastDateDesc"    => list.OrderByDescending(x => x.LastDate).ToList(),
+            _                 => list.OrderByDescending(x => x.TotalKg).ToList(),
+        };
+
+    async Task OnSearchInput(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+
+        // debounce: cancel tidligere og vent lidt
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var ct = _searchCts.Token;
+
+        try
+        {
+            await Task.Delay(350, ct);
+            await Load();
+        }
+        catch (TaskCanceledException)
+        {
+            // ignore
+        }
+    }
+
     void OpenCustomer(string customerNo)
     {
         if (string.IsNullOrWhiteSpace(customerNo)) return;
         Nav.NavigateTo($"/ml-customer/{Uri.EscapeDataString(customerNo)}");
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        await Load();
     }
 }
