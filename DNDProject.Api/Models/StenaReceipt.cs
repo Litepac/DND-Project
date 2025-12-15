@@ -8,18 +8,18 @@ namespace DNDProject.Api.Models
     {
         public int Id { get; set; }
 
-        // LevNr i databasen (int, men kan være NULL)
         public int? CustomerKey { get; set; }
-
-        // Navn i databasen (må gerne være null i DB – vi håndterer det som string?)
         public string? CustomerName { get; set; }
 
-        public DateTime ReceiptDate { get; set; }   // KoeresDato
+        public DateTime ReceiptDate { get; set; }
 
-        public string? ItemNumber { get; set; }  // Varenummer
-        public string? ItemText   { get; set; }  // Varebeskrivelse
+        public string? ItemNumber { get; set; }
+        public string? ItemText { get; set; }
 
-        public string? Unit   { get; set; }      // Enhed (KG/STK/...)
-        public string? Amount { get; set; }      // Antal (nvarchar)
+        public string? Unit { get; set; }
+        public string? Amount { get; set; }
+
+        [Column("KoebsordreNummer")]  // <- VIGTIGT: matcher Modtagelse kolonnen
+        public int? PurchaseOrderNumber { get; set; }
     }
 }

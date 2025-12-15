@@ -9,11 +9,11 @@ namespace DNDProject.Api.Models
         [Key]
         [Column("Varenummer")]
         public int ItemNumber { get; set; }
-
+        
         [Column("Kapacitet")]
         public int Capacity { get; set; }
 
         [Column("Enhed")]
-        public string Unit { get; set; } = string.Empty;
+        public string? Unit { get; set; }
     }
 }

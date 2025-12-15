@@ -8,13 +8,13 @@ namespace DNDProject.Api.Models
     public class StenaContainerDef
     {
         [Key]
-        public int Varenummer { get; set; }
+public int? Koebsordrenr { get; set; } // Koebsordrenr (int)
+public int? Lev_nr { get; set; }       // Lev_nr (int)
+public int? Varenr { get; set; }       // Varenr (int)
+public string? Beskrivelse { get; set; }
+public string? Frekvens { get; set; }
+public string? Uge_dag { get; set; }
+public DateTime? Start_dato { get; set; }
 
-        public string VareBeskrivelse { get; set; } = string.Empty;
-
-        public int? Kapacitet { get; set; }          // fx 660
-        public string? Enhed { get; set; }           // fx "L"
-
-        public decimal? Lejeomkostning_pr_måned { get; set; }
     }
 }

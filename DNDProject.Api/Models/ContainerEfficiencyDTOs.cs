@@ -15,6 +15,9 @@ namespace DNDProject.Api.Models
         public int InefficientEmpties { get; set; }       // antal tømninger under threshold
         public float InefficientPct { get; set; }         // % ineffektive tømninger
         public float AvgFillPct { get; set; }             // gennemsnitlig fyldningsgrad i %
+        public float CapacityKg { get; set; }
+        public int ThresholdPct { get; set; }
+
     }
 
     /// <summary>

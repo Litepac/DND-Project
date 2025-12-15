@@ -1,202 +1,205 @@
 @page "/container-efficiency"
 
-@using System.Net.Http.Json
+@using System.Text.Json
 @using DNDProject.Web.Models
 @inject HttpClient Http
 
-<h3>Kunde – tømningsanalyse (660 L container)</h3>
+<h3 class="mb-3">Kunde – tømningsanalyse (660 L container)</h3>
 
-@if (!string.IsNullOrEmpty(_error))
+@if (!string.IsNullOrWhiteSpace(_error))
 {
     <div class="alert alert-danger">@_error</div>
 }
 
-<div class="row">
-    <!-- Venstre: kunde-oversigt -->
-    <div class="col-md-4 border-end">
+<div class="row g-3">
 
-        <h5>Alle kunder</h5>
-        <p class="text-muted mb-1">
-            Viser andel af tømninger, hvor fyldningen er under grænsen.
-        </p>
+    <!-- VENSTRE: Kunder -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="card-title mb-1">Alle kunder</h5>
+                        <div class="text-muted small">Andel af tømninger under grænsen.</div>
+                    </div>
+                </div>
 
-        <div class="row mb-2">
-            <div class="col-7">
-                <input class="form-control form-control-sm"
-                       placeholder="Søg på kundenavn eller nummer..."
-                       @bind="_searchText" />
-            </div>
-            <div class="col-3">
-                <select class="form-select form-select-sm"
-                        @onchange="OnMonthsChanged">
-                    <option value="3" selected="@(_months == 3)">3 mdr</option>
-                    <option value="6" selected="@(_months == 6)">6 mdr</option>
-                    <option value="12" selected="@(_months == 12)">12 mdr</option>
-                    <option value="24" selected="@(_months == 24)">24 mdr</option>
-                </select>
-            </div>
-            <div class="col-2">
-                <select class="form-select form-select-sm"
-                        @onchange="OnThresholdChanged">
-                    <option value="70" selected="@(_thresholdPct == 70)">70%</option>
-                    <option value="75" selected="@(_thresholdPct == 75)">75%</option>
-                    <option value="80" selected="@(_thresholdPct == 80)">80%</option>
-                    <option value="85" selected="@(_thresholdPct == 85)">85%</option>
-                </select>
+                <div class="row g-2 mt-3">
+                    <div class="col-7">
+                        <input class="form-control form-control-sm"
+                               placeholder="Søg navn eller kundenr..."
+                               @bind="_searchText" />
+                    </div>
+                    <div class="col-3">
+                        <select class="form-select form-select-sm" @onchange="OnMonthsChanged">
+                            <option value="3" selected="@(_months == 3)">3 mdr</option>
+                            <option value="6" selected="@(_months == 6)">6 mdr</option>
+                            <option value="12" selected="@(_months == 12)">12 mdr</option>
+                            <option value="24" selected="@(_months == 24)">24 mdr</option>
+                        </select>
+                    </div>
+                    <div class="col-2">
+                        <select class="form-select form-select-sm" @onchange="OnThresholdChanged">
+                            <option value="70" selected="@(_thresholdPct == 70)">70%</option>
+                            <option value="75" selected="@(_thresholdPct == 75)">75%</option>
+                            <option value="80" selected="@(_thresholdPct == 80)">80%</option>
+                            <option value="85" selected="@(_thresholdPct == 85)">85%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-3" style="max-height: 70vh; overflow:auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width:80px;">Kunde</th>
+                                <th>Navn</th>
+                                <th class="text-end" style="width:110px;">Ineff.</th>
+                                <th class="text-end" style="width:70px;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_customers is null || !_customers.Any())
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-muted">
+                                        @_isLoading ? "Henter kunder..." : "Ingen kunder fundet."
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var c in FilteredCustomers)
+                                {
+                                    var selected = _selectedCustomer?.LevNr == c.LevNr;
+                                    <tr class="@(selected ? "table-primary" : "")"
+                                        style="cursor:pointer"
+                                        @onclick="() => SelectCustomer(c)">
+                                        <td class="fw-semibold">@c.LevNr</td>
+                                        <td>@c.CustomerName</td>
+                                        <td class="text-end">@c.InefficientEmpties / @c.TotalEmpties</td>
+                                        <td class="text-end">@c.InefficientPct.ToString("N1")%</td>
+                                    </tr>
+                                }
+
+                                if (!FilteredCustomers.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-muted">Ingen match.</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
             </div>
         </div>
+    </div>
 
-        <table class="table table-sm table-hover">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 70px;">Kunde</th>
-                    <th>Navn</th>
-                    <th class="text-end" style="width: 90px;">Ineffektiv / total</th>
-                    <th class="text-end" style="width: 70px;">% ineff.</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (_customers is null || !_customers.Any())
+    <!-- HØJRE: Detaljer -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+
+                @if (_selectedCustomer is null)
                 {
-                    <tr>
-                        <td colspan="4" class="text-muted">Ingen kunder fundet.</td>
-                    </tr>
+                    <div class="text-muted">Vælg en kunde i listen.</div>
+                }
+                else if (_isLoadingDetails)
+                {
+                    <div>Henter detaljer...</div>
+                }
+                else if (_details is null)
+                {
+                    <div class="text-muted">Ingen detaljer at vise.</div>
                 }
                 else
                 {
-                    @foreach (var c in FilteredCustomers)
-                    {
-                        var isSelected = _selectedCustomer?.LevNr == c.LevNr;
-                        var rowClass = isSelected ? "table-primary" : string.Empty;
+                    var d = _details;
+                    var isOk = d.AvgFillPct >= d.ThresholdPct;
 
-                        <tr class="@rowClass"
-                            style="cursor:pointer;"
-                            @onclick="(() => OnCustomerClicked(c))">
-                            <td>@c.LevNr</td>
-                            <td>@c.CustomerName</td>
-                            <td class="text-end">
-                                @c.InefficientEmpties / @c.TotalEmpties
-                            </td>
-                            <td class="text-end">
-                                @c.InefficientPct.ToString("N1")%
-                            </td>
-                        </tr>
-                    }
-
-                    if (!FilteredCustomers.Any())
-                    {
-                        <tr>
-                            <td colspan="4" class="text-muted">Ingen kunder matcher søgningen.</td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Højre: detaljer for valgt kunde -->
-    <div class="col-md-8">
-        @if (_selectedCustomer is null)
-        {
-            <p class="text-muted mt-3">
-                Vælg en kunde i listen til venstre.
-            </p>
-        }
-        else if (_details is null)
-        {
-            @if (_isLoading)
-            {
-                <p class="mt-3">Henter detaljer for kunde @_selectedCustomer.LevNr...</p>
-            }
-            else
-            {
-                <p class="text-muted mt-3">Ingen detaljer at vise.</p>
-            }
-        }
-        else
-        {
-            var s = _details;
-
-            <div class="d-flex justify-content-between align-items-start mb-2 mt-2">
-                <div>
-                    <h5>
-                        Detaljer for: @s.LevNr – @s.CustomerName
-                    </h5>
-                    <div>
-                        Containerkapacitet:
-                        <strong>@s.CapacityKg.ToString("N1") kg</strong>
-                        <span class="text-muted">(660 L × 0,13 kg/L)</span>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">@d.CustomerName</h5>
+                            <div class="text-muted small">Kundenr: <span class="fw-semibold">@d.LevNr</span></div>
+                        </div>
+                        <div>
+                            <span class="badge @(isOk ? "bg-success" : "bg-danger")">
+                                @(isOk ? "OK" : "For lav fyldning")
+                            </span>
+                        </div>
                     </div>
-                    <div>
-                        Grænse for ineffektiv tømning:
-                        <strong>@s.ThresholdPct.ToString("N0") %</strong>
-                    </div>
-                    <div>
-                        Tømninger i perioden:
-                        <strong>@s.TotalEmpties</strong>,
-                        heraf ineffektive:
-                        <strong>@s.InefficientEmpties (@s.InefficientPct.ToString("N1")%)</strong>
-                    </div>
-                    <div>
-                        Gennemsnitlig fyldningsgrad:
-                        <strong>@s.AvgFillPct.ToString("N1")%</strong>
-                    </div>
-                </div>
 
-                <div class="text-end">
-                    <small class="d-block">
-                        <span class="badge bg-success me-1">&nbsp;</span>Over grænse
-                    </small>
-                    <small class="d-block">
-                        <span class="badge bg-danger me-1">&nbsp;</span>Under grænse
-                    </small>
-                </div>
-            </div>
-
-            <hr />
-
-            <h6>Seneste tømninger</h6>
-            <p class="text-muted">
-                Viser op til de seneste 50 tømninger. Grøn = fyldning over grænsen, rød = tømt for tidligt.
-            </p>
-
-            @if (s.Empties is null || !s.Empties.Any())
-            {
-                <p class="text-muted">Ingen tømninger i den valgte periode.</p>
-            }
-            else
-            {
-                float maxFill = s.Empties.Max(e => e.FillPct);
-                if (maxFill <= 0) { maxFill = 100; }
-
-                <div class="mb-2">
-                    @foreach (var e in s.Empties)
-                    {
-                        var pctLabel = e.FillPct.ToString("N1") + "%";
-                        var widthPct = Math.Clamp(e.FillPct, 0, 150); // bar-længde
-                        var isBad = e.FillPct < s.ThresholdPct;
-                        var barClass = isBad ? "bg-danger" : "bg-success";
-
-                        <div class="mb-1">
-                            <div class="d-flex justify-content-between small">
-                                <span>@e.KoeresDato.ToString("yyyy-MM-dd")</span>
-                                <span>@e.WeightKg.ToString("N1") kg (@pctLabel)</span>
-                            </div>
-                            <div class="progress" style="height: 10px;">
-                                <div class="progress-bar @barClass"
-                                     role="progressbar"
-                                     style="width:@widthPct%;"
-                                     aria-valuenow="@e.FillPct"
-                                     aria-valuemin="0"
-                                     aria-valuemax="150">
-                                </div>
+                    <div class="row g-2 mt-3">
+                        <div class="col-md-3">
+                            <div class="border rounded p-2">
+                                <div class="text-muted small">Kapacitet</div>
+                                <div class="fw-semibold">@d.CapacityKg.ToString("N1") kg</div>
+                                <div class="text-muted small">660L × 0,13</div>
                             </div>
                         </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2">
+                                <div class="text-muted small">Grænse</div>
+                                <div class="fw-semibold">@d.ThresholdPct%</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2">
+                                <div class="text-muted small">Ineffektiv</div>
+                                <div class="fw-semibold">@d.InefficientPct.ToString("N1")%</div>
+                                <div class="text-muted small">@d.InefficientEmpties / @d.TotalEmpties</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-2">
+                                <div class="text-muted small">Gns. fyldning</div>
+                                <div class="fw-semibold">@d.AvgFillPct.ToString("N1")%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3" />
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Seneste tømninger</h6>
+                        <div class="text-muted small">Viser op til 50</div>
+                    </div>
+
+                    @if (d.Empties is null || !d.Empties.Any())
+                    {
+                        <p class="text-muted mt-2">Ingen tømninger i perioden.</p>
                     }
-                </div>
-            }
-        }
+                    else
+                    {
+                        <div class="mt-2" style="max-height: 60vh; overflow:auto;">
+                            @foreach (var e in d.Empties)
+                            {
+                                var bad = e.FillPct < d.ThresholdPct;
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">@e.KoeresDato.ToString("yyyy-MM-dd")</span>
+                                        <span class="fw-semibold">
+                                            @e.WeightKg.ToString("N1") kg
+                                            <span class="text-muted">(@e.FillPct.ToString("N1")%)</span>
+                                        </span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar @(bad ? "bg-danger" : "bg-success")"
+                                             style="width:@Math.Clamp(e.FillPct, 0, 150)%">
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+
+            </div>
+        </div>
     </div>
+
 </div>
 
 @code {
@@ -204,26 +207,24 @@
     private ContainerEfficiencyCustomerSummaryDto? _selectedCustomer;
     private ContainerEfficiencyCustomerDetailDto? _details;
 
-    private bool _isLoading = false;
     private string? _error;
-
     private int _months = 12;
     private int _thresholdPct = 80;
-    private string _searchText = string.Empty;
+    private string _searchText = "";
+
+    private bool _isLoading = false;
+    private bool _isLoadingDetails = false;
 
     private IEnumerable<ContainerEfficiencyCustomerSummaryDto> FilteredCustomers =>
         string.IsNullOrWhiteSpace(_searchText)
             ? _customers ?? Enumerable.Empty<ContainerEfficiencyCustomerSummaryDto>()
             : (_customers ?? Enumerable.Empty<ContainerEfficiencyCustomerSummaryDto>())
                 .Where(c =>
-                    (c.CustomerName ?? string.Empty)
-                        .Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-                    || c.LevNr.ToString().Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+                    (c.CustomerName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase)
+                    || c.LevNr.ToString().Contains(_searchText));
 
     protected override async Task OnInitializedAsync()
-    {
-        await LoadSummaries();
-    }
+        => await LoadSummaries();
 
     private async Task LoadSummaries()
     {
@@ -232,14 +233,31 @@
 
         try
         {
-            var uri = $"api/stena/efficiency/660/summary?months={_months}&thresholdPct={_thresholdPct}";
-            _customers = await Http.GetFromJsonAsync<List<ContainerEfficiencyCustomerSummaryDto>>(uri);
+            var url = $"api/stena/efficiency/summary?months={_months}&thresholdPct={_thresholdPct}";
+            var response = await Http.GetAsync(url);
+            var body = await response.Content.ReadAsStringAsync();
 
-            if (_customers is not null && _customers.Count > 0)
+            if (!response.IsSuccessStatusCode)
             {
-                _selectedCustomer = _customers[0];
-                await LoadDetails(_selectedCustomer.LevNr);
+                _customers = new();
+                _selectedCustomer = null;
+                _details = null;
+                _error = $"API-fejl ({(int)response.StatusCode}): {body}";
+                return;
             }
+
+            _customers = string.IsNullOrWhiteSpace(body)
+                ? new List<ContainerEfficiencyCustomerSummaryDto>()
+                : JsonSerializer.Deserialize<List<ContainerEfficiencyCustomerSummaryDto>>(
+                      body,
+                      new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                  ) ?? new List<ContainerEfficiencyCustomerSummaryDto>();
+
+            _selectedCustomer = _customers.FirstOrDefault();
+            _details = null;
+
+            if (_selectedCustomer != null)
+                await LoadDetails(_selectedCustomer.LevNr);
         }
         catch (Exception ex)
         {
@@ -254,47 +272,67 @@
     private async Task LoadDetails(int levNr)
     {
         _error = null;
-        _isLoading = true;
+        _isLoadingDetails = true;
 
         try
         {
-            var uri = $"api/stena/efficiency/660/customer/{levNr}?months={_months}&thresholdPct={_thresholdPct}";
-            _details = await Http.GetFromJsonAsync<ContainerEfficiencyCustomerDetailDto>(uri);
+            var url = $"api/stena/efficiency/customer/{levNr}?months={_months}&thresholdPct={_thresholdPct}";
+            var response = await Http.GetAsync(url);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _details = null;
+                _error = $"Kunne ikke hente detaljer ({(int)response.StatusCode}): {body}";
+                return;
+            }
+
+            _details = string.IsNullOrWhiteSpace(body)
+                ? null
+                : JsonSerializer.Deserialize<ContainerEfficiencyCustomerDetailDto>(
+                      body,
+                      new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                  );
+
+            if (_details != null)
+                _details.ThresholdPct = _thresholdPct;
         }
         catch (Exception ex)
         {
-            _error = $"Kunne ikke hente detaljer for kunde {levNr}: {ex.Message}";
+            _details = null;
+            _error = $"Kunne ikke hente detaljer: {ex.Message}";
         }
         finally
         {
-            _isLoading = false;
+            _isLoadingDetails = false;
         }
     }
 
-    private async Task OnCustomerClicked(ContainerEfficiencyCustomerSummaryDto customer)
+    private async Task SelectCustomer(ContainerEfficiencyCustomerSummaryDto c)
     {
-        if (_selectedCustomer?.LevNr == customer.LevNr)
+        if (_selectedCustomer?.LevNr == c.LevNr)
             return;
 
-        _selectedCustomer = customer;
-        await LoadDetails(customer.LevNr);
+        _selectedCustomer = c;
+        _details = null;
+        await LoadDetails(c.LevNr);
     }
 
     private async Task OnMonthsChanged(ChangeEventArgs e)
     {
-        if (!int.TryParse(e.Value?.ToString(), out var m))
-            return;
-
-        _months = m;
-        await LoadSummaries();
+        if (int.TryParse(e.Value?.ToString(), out var m))
+        {
+            _months = m;
+            await LoadSummaries();
+        }
     }
 
     private async Task OnThresholdChanged(ChangeEventArgs e)
     {
-        if (!int.TryParse(e.Value?.ToString(), out var t))
-            return;
-
-        _thresholdPct = t;
-        await LoadSummaries();
+        if (int.TryParse(e.Value?.ToString(), out var t))
+        {
+            _thresholdPct = t;
+            await LoadSummaries();
+        }
     }
 }
