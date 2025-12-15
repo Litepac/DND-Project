@@ -54,21 +54,37 @@ namespace DNDProject.Api.Controllers
 
 private async Task<Dictionary<int, int>> BuildCapacityLookupAsync(IEnumerable<int> containerItemNumbers)
 {
-    var keys = containerItemNumbers.Distinct().ToList();
+    var keys = containerItemNumbers
+        .Where(n => n > 0)
+        .Distinct()
+        .ToList();
+
     if (keys.Count == 0)
         return new Dictionary<int, int>();
 
-    var caps = await _db.ContainerCapacities
-        .Where(c => keys.Contains(c.ItemNumber) &&
-                    c.Unit != null &&
-                    c.Unit.Trim().ToUpper() == "L")
-        .Select(c => new { c.ItemNumber, c.Capacity })
-        .ToListAsync();
+var caps = await _db.ContainerCapacities
+    .AsNoTracking()
+    .Where(c =>
+        keys.Contains(c.ItemNumber) &&
+        c.Unit != null &&
+        c.Unit.Trim().ToUpper() == "L" &&
+        c.Capacity != null &&
+        c.Capacity > 0)
+    .Select(c => new
+    {
+        c.ItemNumber,
+        Capacity = c.Capacity!.Value
+    })
+    .ToListAsync();
 
+
+    // Hvis der findes dubletter pr varenummer, vælg MAX
     return caps
-        .Where(x => x.Capacity > 0)
         .GroupBy(x => x.ItemNumber)
-        .ToDictionary(g => g.Key, g => g.First().Capacity);
+        .ToDictionary(
+            g => g.Key,
+            g => (int)Math.Round(g.Max(x => x.Capacity), MidpointRounding.AwayFromZero)
+        );
 }
 
 
