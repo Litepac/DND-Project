@@ -1,0 +1,135 @@
+@page "/ml-customers"
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject DNDProject.Web.Services.ITokenStorage Tokens
+@inject NavigationManager Nav
+
+<h3>ML – Top kunder</h3>
+
+<div class="d-flex align-items-end gap-3 mb-3">
+    <div>
+        <label class="form-label">From</label>
+        <InputDate @bind-Value="from" class="form-control" />
+    </div>
+
+    <div>
+        <label class="form-label">To</label>
+        <InputDate @bind-Value="to" class="form-control" />
+    </div>
+
+    <button class="btn btn-primary" @onclick="Load" disabled="@busy">
+        Hent
+    </button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (busy)
+{
+    <div>Henter...</div>
+}
+else if (data is not null)
+{
+    <div class="mb-2">
+        <strong>Periode:</strong> @data.From.ToString("yyyy-MM-dd") – @data.To.ToString("yyyy-MM-dd")
+        <span class="ms-2">(kunder: @data.Customers)</span>
+    </div>
+
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Kundenr</th>
+                <th>Kundenavn</th>
+                <th class="text-end">Dage</th>
+                <th class="text-end">Total kg</th>
+                <th class="text-end">Avg kg/dag</th>
+                <th>Sidste dato</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in data.Top)
+            {
+                <tr style="cursor:pointer" @onclick="() => OpenCustomer(r.CustomerNo)">
+                    <td>@r.CustomerNo</td>
+                    <td>@r.CustomerName</td>
+                    <td class="text-end">@r.Days</td>
+                    <td class="text-end">@r.TotalKg.ToString("N0")</td>
+                    <td class="text-end">@r.AvgKgPerDay.ToString("N1")</td>
+                    <td>@r.LastDate.ToString("yyyy-MM-dd")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    DateTime from = new(2024, 1, 1);
+    DateTime to   = new(2024, 12, 31);
+
+    bool busy;
+    string? error;
+
+    CustomersResponse? data;
+
+    public sealed record CustomersResponse(DateTime From, DateTime To, int Customers, List<CustomerRow> Top);
+    public sealed record CustomerRow(string CustomerNo, string CustomerName, int Days, double TotalKg, double AvgKgPerDay, DateTime LastDate);
+
+    async Task Load()
+    {
+        busy = true;
+        error = null;
+
+        try
+        {
+            var token = await Tokens.GetAsync();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                error = "Du er ikke logget ind (mangler token).";
+                return;
+            }
+
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var url = $"api/ml-viz/customers?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+            var resp = await Http.GetAsync(url);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                error = $"Kunne ikke hente data ({(int)resp.StatusCode})";
+                return;
+            }
+
+            var dto = await resp.Content.ReadFromJsonAsync<CustomersResponse>();
+            if (dto is null)
+            {
+                error = "Kunne ikke læse svar fra serveren.";
+                return;
+            }
+
+            data = dto;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    void OpenCustomer(string customerNo)
+    {
+        if (string.IsNullOrWhiteSpace(customerNo)) return;
+        Nav.NavigateTo($"/ml-customer/{Uri.EscapeDataString(customerNo)}");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+}

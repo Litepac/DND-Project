@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using DNDProject.Api.Data;
 using DNDProject.Api.Models;
+using DNDProject.Api.ML;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -12,26 +13,35 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --------------------
-// DbContexts
-// --------------------
+// ======================================================
+// DATABASES
+// ======================================================
 
-// Stena/domain DB (INGEN Identity-tabeller her)
+// Stena / domain DB (INGEN Identity-tabeller)
 builder.Services.AddDbContext<AppDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("StenaConnection")));
 
-// Auth/Identity DB (AspNetUsers/AspNetRoles osv.)
+// Auth / Identity DB (AspNetUsers, AspNetRoles osv.)
 builder.Services.AddDbContext<AuthDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("AuthConnection")));
 
-// --------------------
-// Controllers
-// --------------------
+// ======================================================
+// SERVICES
+// ======================================================
+
 builder.Services.AddControllers();
 
-// --------------------
+// ML / data extraction
+builder.Services.AddScoped<DNDProject.Api.ML.MLDataService>();
+builder.Services.AddScoped<DNDProject.Api.ML.MLTrainerService>();
+
+
+
+
+// ======================================================
 // CORS (åben i dev)
-// --------------------
+// ======================================================
+
 builder.Services.AddCors(opt =>
 {
     opt.AddDefaultPolicy(p => p
@@ -40,13 +50,18 @@ builder.Services.AddCors(opt =>
         .AllowAnyMethod());
 });
 
-// --------------------
-// Swagger + JWT-knap
-// --------------------
+// ======================================================
+// SWAGGER + JWT
+// ======================================================
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "DNDProject API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "DNDProject API",
+        Version = "v1"
+    });
 
     var securityScheme = new OpenApiSecurityScheme
     {
@@ -70,9 +85,10 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// --------------------
-// Identity (på AuthDbContext)
-// --------------------
+// ======================================================
+// IDENTITY (AuthDbContext)
+// ======================================================
+
 builder.Services
     .AddIdentityCore<ApplicationUser>(opt =>
     {
@@ -85,9 +101,10 @@ builder.Services
     .AddEntityFrameworkStores<AuthDbContext>()
     .AddSignInManager();
 
-// --------------------
-// JWT
-// --------------------
+// ======================================================
+// JWT AUTHENTICATION
+// ======================================================
+
 var jwt = builder.Configuration.GetSection("Jwt");
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
 
@@ -120,9 +137,11 @@ builder.Services
         };
     });
 
-// --------------------
-// Authorization: ALT kræver login (undtagen [AllowAnonymous])
-// --------------------
+// ======================================================
+// AUTHORIZATION
+// ALT kræver login (undtagen [AllowAnonymous])
+// ======================================================
+
 builder.Services.AddAuthorization(o =>
 {
     o.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -130,11 +149,16 @@ builder.Services.AddAuthorization(o =>
         .Build();
 });
 
+// ======================================================
+// BUILD APP
+// ======================================================
+
 var app = builder.Build();
 
-// --------------------
-// Pipeline
-// --------------------
+// ======================================================
+// PIPELINE
+// ======================================================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -149,15 +173,16 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// --------------------
-// Auth DB migrations + seeding (DEV)
-// --------------------
+// ======================================================
+// AUTH DB MIGRATION + SEED (DEV ONLY)
+// RØRER IKKE STENA DB
+// ======================================================
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var env = services.GetRequiredService<IWebHostEnvironment>();
 
-    // KUN Auth DB migreres (rører ikke Stena DB)
     var authDb = services.GetRequiredService<AuthDbContext>();
     await authDb.Database.MigrateAsync();
 

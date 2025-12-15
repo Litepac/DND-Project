@@ -1,0 +1,124 @@
+@page "/ml-daily"
+@using DNDProject.Web.Models
+@inject DNDProject.Web.Services.MlApiClient Api
+
+<h3>ML – Daily pickups</h3>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (loading)
+{
+    <p>Henter data…</p>
+}
+else if (data is null)
+{
+    <p>Ingen data.</p>
+}
+else
+{
+    <div class="mb-3 d-flex gap-2 align-items-end flex-wrap">
+        <div>
+            <label class="form-label">Søg (kundenr/navn/skabelon)</label>
+            <input class="form-control" @bind="q" @bind:event="oninput" />
+        </div>
+
+        <div>
+            <label class="form-label">Maks rækker</label>
+            <input class="form-control" type="number" min="10" max="2000" step="10" @bind="take" />
+        </div>
+
+        <button class="btn btn-outline-primary" @onclick="Reload">Reload</button>
+    </div>
+
+    <p class="text-muted">
+        Total i API: <b>@data.Count</b> | Viser: <b>@filtered.Count</b>
+    </p>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Dato</th>
+                    <th>Skabelon</th>
+                    <th class="text-end">Kg</th>
+                    <th>Kundenr</th>
+                    <th>Kundenavn</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in filtered)
+                {
+                    <tr>
+                        <td>@r.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@r.Skabelonnr</td>
+                        <td class="text-end">@r.CollectedKg.ToString("0.##")</td>
+                        <td>@r.CustomerNo</td>
+                        <td>@r.CustomerName</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    bool loading = true;
+    string? error;
+    DailyResponseDto? data;
+
+    string q = "";
+    int take = 200;
+
+    List<PickupDailyDto> filtered = new();
+
+    protected override async Task OnInitializedAsync()
+        => await Reload();
+
+    async Task Reload()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            data = await Api.GetDailyAsync();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    void ApplyFilter()
+    {
+        if (data is null) { filtered = new(); return; }
+
+        var query = (q ?? "").Trim();
+
+        IEnumerable<PickupDailyDto> rows = data.Sample;
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            rows = rows.Where(r =>
+                (r.CustomerNo ?? "").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (r.CustomerName ?? "").Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (r.Skabelonnr ?? "").Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filtered = rows.Take(Math.Max(10, take)).ToList();
+    }
+
+    // kør filter når q ændrer sig
+    string Q
+    {
+        get => q;
+        set { q = value; ApplyFilter(); }
+    }
+}

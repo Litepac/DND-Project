@@ -1,0 +1,121 @@
+@page "/ml-customer/{CustomerNo}"
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject DNDProject.Web.Services.ITokenStorage Tokens
+@inject NavigationManager Nav
+
+<h3>ML – Anbefaling (@CustomerNo)</h3>
+
+<button class="btn btn-link p-0 mb-3" @onclick="Back">← Tilbage</button>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (busy)
+{
+    <div>Henter...</div>
+}
+else if (rec is not null)
+{
+    <div class="card" style="max-width:720px;">
+        <div class="card-body">
+            <h5 class="card-title mb-1">@rec.CustomerName</h5>
+            <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
+
+            <dl class="row mb-0">
+                <dt class="col-sm-5">Container</dt>
+                <dd class="col-sm-7">@rec.ContainerCount × @rec.ContainerL L</dd>
+
+                <dt class="col-sm-5">Frekvens</dt>
+                <dd class="col-sm-7">Hver @rec.FrequencyDays dage</dd>
+
+                <dt class="col-sm-5">Expected fill</dt>
+                <dd class="col-sm-7">@rec.ExpectedFill.ToString("P0")</dd>
+
+                <dt class="col-sm-5">Pred kg/dag (safe)</dt>
+                <dd class="col-sm-7">@rec.PredKgPerDaySafe.ToString("N0")</dd>
+            </dl>
+        </div>
+    </div>
+}
+else
+{
+    <div>Ingen recommendation fundet.</div>
+}
+
+@code {
+    [Parameter] public string CustomerNo { get; set; } = "";
+
+    DateTime from = new(2024, 1, 1);
+    DateTime to   = new(2024, 12, 31);
+
+    bool busy;
+    string? error;
+
+    RecommendationDto? rec;
+
+    public sealed record RecommendationDto(
+        string CustomerNo,
+        string CustomerName,
+        int ContainerL,
+        int ContainerCount,
+        int FrequencyDays,
+        double ExpectedFill,
+        double PredKgPerDaySafe
+    );
+
+    protected override async Task OnParametersSetAsync()
+        => await Load();
+
+    async Task Load()
+    {
+        busy = true;
+        error = null;
+        rec = null;
+
+        try
+        {
+            var token = await Tokens.GetAsync();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                error = "Du er ikke logget ind (mangler token).";
+                return;
+            }
+
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // ✅ KORREKT: GET /api/ml/recommend-one
+            var url =
+                $"api/ml/recommend-one?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&customerNo={Uri.EscapeDataString(CustomerNo)}";
+
+            var resp = await Http.GetAsync(url);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                error = "Ingen recommendation fundet (404).";
+                return;
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                error = $"Kunne ikke hente recommendation ({(int)resp.StatusCode})";
+                return;
+            }
+
+            rec = await resp.Content.ReadFromJsonAsync<RecommendationDto>();
+            if (rec is null) error = "Kunne ikke læse svar fra serveren.";
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    void Back() => Nav.NavigateTo("/ml-customers");
+}
