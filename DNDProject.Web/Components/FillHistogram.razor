@@ -1,0 +1,34 @@
+@using DNDProject.Web.Models
+
+<div>
+    @if (Empties == null || Empties.Count == 0)
+    {
+        <div class="text-muted small">Ingen data.</div>
+    }
+    else
+    {
+        var under = Empties.Count(e => e.FillPct < ThresholdPct);
+        var over = Empties.Count - under;
+        var total = Empties.Count;
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="small text-muted">Under/over grænse</div>
+            <div class="small fw-semibold">@under / @total under (@(total == 0 ? "0,0" : (100.0 * under / total).ToString("N1"))%)</div>
+        </div>
+
+        <div class="progress" style="height: 14px;">
+            <div class="progress-bar bg-danger" style="width:@(total == 0 ? 0 : (100.0 * under / total))%"></div>
+            <div class="progress-bar bg-success" style="width:@(total == 0 ? 0 : (100.0 * over / total))%"></div>
+        </div>
+
+        <div class="d-flex justify-content-between small text-muted mt-1">
+            <span>Under</span>
+            <span>Over</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<ContainerEmptyingDto> Empties { get; set; } = new();
+    [Parameter] public int ThresholdPct { get; set; } = 80;
+}

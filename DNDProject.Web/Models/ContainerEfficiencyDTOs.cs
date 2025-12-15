@@ -7,10 +7,13 @@ namespace DNDProject.Web.Models
     public class ContainerEfficiencyCustomerSummaryDto
     {
         [JsonPropertyName("customerKey")]
-        public int LevNr { get; set; }
+        public int CustomerKey { get; set; }
 
         [JsonPropertyName("customerName")]
         public string? CustomerName { get; set; }
+
+        [JsonPropertyName("liters")]
+        public int Liters { get; set; }                 // 120/240/660/1100
 
         [JsonPropertyName("totalEmpties")]
         public int TotalEmpties { get; set; }
@@ -23,15 +26,30 @@ namespace DNDProject.Web.Models
 
         [JsonPropertyName("avgFillPct")]
         public float AvgFillPct { get; set; }
+
+        [JsonPropertyName("capacityKg")]
+        public float CapacityKg { get; set; }
+
+        [JsonPropertyName("thresholdPct")]
+        public int ThresholdPct { get; set; }
     }
 
     public class ContainerEfficiencyCustomerDetailDto
     {
         [JsonPropertyName("customerKey")]
-        public int LevNr { get; set; }
+        public int CustomerKey { get; set; }
 
         [JsonPropertyName("customerName")]
         public string? CustomerName { get; set; }
+
+        [JsonPropertyName("liters")]
+        public int Liters { get; set; }
+
+        [JsonPropertyName("capacityKg")]
+        public float CapacityKg { get; set; }
+
+        [JsonPropertyName("thresholdPct")]
+        public int ThresholdPct { get; set; }
 
         [JsonPropertyName("totalEmpties")]
         public int TotalEmpties { get; set; }
@@ -47,19 +65,12 @@ namespace DNDProject.Web.Models
 
         [JsonPropertyName("empties")]
         public List<ContainerEmptyingDto> Empties { get; set; } = new();
-
-        // UI-hjælpere (ikke fra API)
-        [JsonIgnore]
-        public float CapacityKg => 85.8f; // 660L * 0.13 kg/L
-
-        [JsonIgnore]
-        public int ThresholdPct { get; set; }
     }
 
     public class ContainerEmptyingDto
     {
         [JsonPropertyName("date")]
-        public DateTime KoeresDato { get; set; }
+        public DateTime Date { get; set; }
 
         [JsonPropertyName("weightKg")]
         public float WeightKg { get; set; }
