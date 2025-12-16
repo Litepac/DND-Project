@@ -2,21 +2,54 @@
 @inject AuthenticationStateProvider Auth
 @inject NavigationManager Nav
 
-@ChildContent
+@if (_allowed)
+{
+    @ChildContent
+}
 
 @code {
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    protected override async Task OnParametersSetAsync()
-    {
-        var path = new Uri(Nav.Uri).AbsolutePath;
+    private bool _allowed;
 
-        // /login er public
-        if (path.Equals("/login", StringComparison.OrdinalIgnoreCase))
+    protected override async Task OnInitializedAsync()
+    {
+        var path = Nav.ToBaseRelativePath(Nav.Uri).Trim('/');
+
+        // login er public
+        if (string.Equals(path, "login", StringComparison.OrdinalIgnoreCase))
+        {
+            _allowed = true;
             return;
+        }
 
         var state = await Auth.GetAuthenticationStateAsync();
-        if (!(state.User?.Identity?.IsAuthenticated ?? false))
+        var ok = state.User?.Identity?.IsAuthenticated == true;
+
+        if (!ok)
+        {
             Nav.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        _allowed = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Hvis du navigerer mellem sider mens du er logget ind, skal den ikke “låse”
+        if (_allowed) return;
+
+        var path = Nav.ToBaseRelativePath(Nav.Uri).Trim('/');
+
+        if (string.Equals(path, "login", StringComparison.OrdinalIgnoreCase))
+        {
+            _allowed = true;
+            return;
+        }
+
+        var state = await Auth.GetAuthenticationStateAsync();
+        if (state.User?.Identity?.IsAuthenticated == true)
+            _allowed = true;
     }
 }

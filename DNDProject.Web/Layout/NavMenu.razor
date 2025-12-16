@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+<div class="@NavMenuCssClass nav-scrollable">
     <nav class="nav flex-column">
 
         @if (!string.IsNullOrWhiteSpace(email))
@@ -31,6 +31,12 @@
         }
 
         <div class="nav-item px-3 pt-2">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house" aria-hidden="true"></span> Forside
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 pt-2">
             <NavLink class="nav-link" href="customer-dashboard">
                 <span class="bi bi-graph-up" aria-hidden="true"></span> Kunde-dashboard
             </NavLink>
@@ -42,20 +48,17 @@
             </NavLink>
         </div>
 
-<div class="nav-item px-3">
-    <NavLink class="nav-link" href="ml-customers">
-        <span class="bi bi-graph-up" aria-hidden="true"></span> ML – Top kunder
-    </NavLink>
-</div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="ml-customers">
+                <span class="bi bi-graph-up" aria-hidden="true"></span> ML – Top kunder
+            </NavLink>
+        </div>
 
         <div class="nav-item px-3 mt-3">
             <button type="button" class="btn btn-outline-light w-100" @onclick="Logout">
                 <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Log ud
             </button>
         </div>
-
-
-    
 
     </nav>
 </div>
@@ -98,6 +101,4 @@
         await AuthState.MarkUserAsLoggedOutAsync();
         Nav.NavigateTo("/login", replace: true);
     }
-
-    
 }
