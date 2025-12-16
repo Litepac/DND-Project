@@ -201,3 +201,22 @@ code {
     font-size: 0.8rem;
     font-weight: 500;
 }
+
+@media print {
+  body * { visibility: hidden !important; }
+
+  #print-area, #print-area * {
+    visibility: visible !important;
+  }
+
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  button, .btn {
+    display: none !important;
+  }
+}
