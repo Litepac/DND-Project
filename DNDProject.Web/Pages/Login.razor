@@ -68,8 +68,8 @@
             // Gem token + opdater Blazor auth-state
             await AuthState.MarkUserAsAuthenticatedAsync(dto.Token);
 
-            // Gå til home efter login (kræver @page "/stena" i StenaDashboard.razor)
-            Nav.NavigateTo("/container-efficiency", replace: true);
+            // Efter login -> gå til forsiden
+            Nav.NavigateTo("/", replace: true);
         }
         catch (Exception ex)
         {
