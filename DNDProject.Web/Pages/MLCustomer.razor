@@ -23,6 +23,20 @@ else if (busy)
 else if (rec is not null)
 {
     <div style="max-width:920px;">
+        @{
+            var (outOfScope, outMsg) = IsOutOfScope(rec);
+        }
+
+        @if (outOfScope)
+        {
+            <div class="alert alert-warning">
+                <b>Uden for små-container modellen</b><br />
+                @outMsg<br />
+                <span class="text-muted">
+                    Brug i stedet en “stor-container/komprimator” model eller manuel vurdering.
+                </span>
+            </div>
+        }
 
         <!-- TOP: ML recommendation + manual calculator side by side -->
         <div class="row g-3 mb-3">
@@ -221,13 +235,11 @@ else if (rec is not null)
             </div>
         </div>
 
-       <div class="d-flex gap-2">
-    <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
-    <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
-    <button class="btn btn-outline-primary" @onclick="PrintPdf">Print / PDF</button>
-</div>
-
-
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
+            <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
+            <button class="btn btn-outline-primary" @onclick="PrintPdf">Print / PDF</button>
+        </div>
 
     </div>
 }
@@ -235,6 +247,7 @@ else
 {
     <div>Ingen recommendation fundet.</div>
 }
+
 
 @code {
     [Parameter] public string CustomerNo { get; set; } = "";
@@ -402,4 +415,21 @@ else
             return litersPerPickup / totalCapacity;
         }
     }
+
+    (bool outOfScope, string msg) IsOutOfScope(RecommendationDto r)
+{
+    // Justér thresholds efter jeres regler
+    const int max1100Count = 12;         // 1100L "for mange"
+    const int hardStop1100Count = 15;    // dit eksempel
+
+    var totalL = r.ContainerCount * r.ContainerL;
+
+    if (r.ContainerL == 1100 && r.ContainerCount >= hardStop1100Count)
+        return (true, $"Anbefalingen kræver {r.ContainerCount} × 1100 L ({totalL:N0} L). Det tyder på at kunden er for stor til små containere.");
+
+    if (r.ContainerL == 1100 && r.ContainerCount > max1100Count)
+        return (true, $"Anbefalingen kræver {r.ContainerCount} × 1100 L ({totalL:N0} L). Overvej stor-container/komprimator løsning.");
+    return (false, "");
+}
+
 }
