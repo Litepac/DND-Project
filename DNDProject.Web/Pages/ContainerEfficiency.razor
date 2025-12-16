@@ -156,7 +156,8 @@
                 {
                     var d = _details;
                     var latest = LatestEmpty;
-                    var isOk = d.AvgFillPct >= d.ThresholdPct;
+                    var avgFillUi = AvgFillForUi; // ✅ beregnet fra sanitiserede empties
+                    var isOk = avgFillUi >= d.ThresholdPct;
 
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -169,8 +170,19 @@
                         </span>
                     </div>
 
+                    <div class="d-flex justify-content-end mt-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="excludeOutliers"
+                                   @bind="_excludeOutliersFromKpis" />
+                            <label class="form-check-label small text-muted" for="excludeOutliers">
+                                Ignorer outliers i KPI’er
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- TOP KPI -->
-                    <div class="row g-2 mt-3">
+                    <div class="row g-2 mt-2">
                         <div class="col-md-3">
                             <div class="border rounded p-2">
                                 <div class="text-muted small">Kapacitet</div>
@@ -198,7 +210,7 @@
                         <div class="col-md-3">
                             <div class="border rounded p-2">
                                 <div class="text-muted small">Gns. fyldning</div>
-                                <div class="fw-semibold">@d.AvgFillPct.ToString("N1")%</div>
+                                <div class="fw-semibold">@avgFillUi.ToString("N1")%</div>
 
                                 @if (latest != null)
                                 {
@@ -207,15 +219,11 @@
                                     </div>
                                 }
 
-                                @if (d.Empties != null)
+                                @if (OutlierCount > 0)
                                 {
-                                    var outliers = d.Empties.Count(x => x.FillPct > MaxDisplayFillPct);
-                                    if (outliers > 0)
-                                    {
-                                        <div class="text-muted small">
-                                            Datakvalitet: <b>@outliers</b> outlier(s) (&gt; @MaxDisplayFillPct%)
-                                        </div>
-                                    }
+                                    <div class="text-muted small">
+                                        Datakvalitet: <b>@OutlierCount</b> outlier(s) (&gt; @MaxDisplayFillPct%)
+                                    </div>
                                 }
                             </div>
                         </div>
@@ -351,6 +359,9 @@
     private bool _showOkCustomers = false;
     private string _sortMode = "Kritisk først"; // "Kritisk først" -> "Gråzone først" -> "OK først"
 
+    // KPI outlier toggle (default ON)
+    private bool _excludeOutliersFromKpis = true;
+
     // ---------------------------
     // UI-sanity: fyld% kan være >100% pga. sammentælling/bulk.
     // Vi viser capped i UI, men markerer outliers.
@@ -371,6 +382,50 @@
 
     protected override async Task OnInitializedAsync()
         => await LoadSummaries();
+
+    // ---------------------------
+    // Details helpers
+    // ---------------------------
+    private ContainerEmptyingDto? LatestEmpty =>
+        _details?.Empties?.OrderByDescending(x => x.Date).FirstOrDefault();
+
+    private int OutlierCount =>
+        _details?.Empties?.Count(e => IsOutlierFill(e.FillPct)) ?? 0;
+
+    // Empties til KPI/månedsoversigt (sanitiseret)
+    private IEnumerable<ContainerEmptyingDto> EmptiesForStats
+    {
+        get
+        {
+            var empties = _details?.Empties ?? new List<ContainerEmptyingDto>();
+            if (!_excludeOutliersFromKpis) return empties;
+
+            // ✅ Ignorer outliers i KPI/månedsoversigt (men behold dem i rå-liste)
+            return empties.Where(e => !IsOutlierFill(e.FillPct));
+        }
+    }
+
+    private double AvgFillForUi
+    {
+        get
+        {
+            var e = EmptiesForStats.ToList();
+            if (e.Count == 0) return 0;
+
+            // ✅ Cap fill før gennemsnit, så KPI ikke eksploderer
+            return e.Average(x => CapFill(x.FillPct));
+        }
+    }
+
+    private IEnumerable<ContainerEmptyingDto> VisibleEmpties
+    {
+        get
+        {
+            var empties = _details?.Empties ?? new List<ContainerEmptyingDto>();
+            var sorted = empties.OrderByDescending(x => x.Date);
+            return _showAllEmpties ? sorted : sorted.Take(10);
+        }
+    }
 
     // ---------------------------
     // V2: KUNDER LISTE (smart sort)
@@ -398,24 +453,21 @@
                 q = q.Where(c => c.AvgFillPct < _thresholdPct);
             }
 
-            // score = kombiner “hvor lav fyldning” + “hvor ofte under grænse”
             double Score(ContainerEfficiencyCustomerSummaryDto c)
             {
-                var lowFill = Math.Max(0, _thresholdPct - c.AvgFillPct);      // pct-point under grænse
-                var underShare = c.InefficientPct;                            // % under
-                var fewDataPenalty = c.TotalEmpties < 8 ? 20 : 0;             // små datamængder = mindre sikker
+                var lowFill = Math.Max(0, _thresholdPct - c.AvgFillPct);
+                var underShare = c.InefficientPct;
+                var fewDataPenalty = c.TotalEmpties < 8 ? 20 : 0;
                 return lowFill * 2.0 + underShare * 0.8 - fewDataPenalty;
             }
 
-            // bucket for sort mode
             int Bucket(ContainerEfficiencyCustomerSummaryDto c)
             {
-                if (c.AvgFillPct < 60) return 0;              // kritisk
-                if (c.AvgFillPct < _thresholdPct) return 1;   // gråzone
-                return 2;                                      // OK
+                if (c.AvgFillPct < 60) return 0;
+                if (c.AvgFillPct < _thresholdPct) return 1;
+                return 2;
             }
 
-            // sortering
             IEnumerable<ContainerEfficiencyCustomerSummaryDto> sorted = _sortMode switch
             {
                 "OK først" => q.OrderByDescending(Bucket).ThenBy(Score),
@@ -442,22 +494,8 @@
     }
 
     // ---------------------------
-    // Details helpers
+    // Månedsoversigt rows (sanitiseret)
     // ---------------------------
-    private ContainerEmptyingDto? LatestEmpty =>
-        _details?.Empties?.OrderByDescending(x => x.Date).FirstOrDefault();
-
-    private IEnumerable<ContainerEmptyingDto> VisibleEmpties
-    {
-        get
-        {
-            var empties = _details?.Empties ?? new List<ContainerEmptyingDto>();
-            var sorted = empties.OrderByDescending(x => x.Date);
-            return _showAllEmpties ? sorted : sorted.Take(10);
-        }
-    }
-
-    // Månedsoversigt rows
     private IEnumerable<MonthRow> MonthlyRows
     {
         get
@@ -467,7 +505,7 @@
 
             var thr = _details.ThresholdPct;
 
-            return _details.Empties
+            return EmptiesForStats
                 .GroupBy(e => e.Date.ToString("yyyy-MM", CultureInfo.InvariantCulture))
                 .OrderByDescending(g => g.Key)
                 .Select(g =>
@@ -475,7 +513,9 @@
                     var count = g.Count();
                     var underCount = g.Count(x => x.FillPct < thr);
                     var underPct = count == 0 ? 0 : (underCount * 100.0 / count);
-                    var avgFill = g.Average(x => x.FillPct);
+
+                    // ✅ cap før gennemsnit
+                    var avgFill = g.Average(x => CapFill(x.FillPct));
 
                     string badgeClass;
                     string badgeLabel;
@@ -512,7 +552,7 @@
         string BadgeLabel
     );
 
-    // zoner (bruges til badges i kundelisten)
+    // zoner (badges i kundelisten) - baseret på threshold (ikke hard-coded 80)
     private static string ZoneLabel(float avgFillPct, int thresholdPct) =>
         avgFillPct < 60 ? "Kritisk" :
         avgFillPct < thresholdPct ? "Gråzone" :
@@ -533,7 +573,7 @@
     }
 
     // ---------------------------
-    // Data loading (uændret)
+    // Data loading
     // ---------------------------
     private async Task LoadSummaries()
     {
@@ -581,7 +621,6 @@
             _details = JsonSerializer.Deserialize<ContainerEfficiencyCustomerDetailDto>(body,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            // reset raw list state når man skifter kunde
             _showAllEmpties = false;
         }
         catch (Exception ex)
