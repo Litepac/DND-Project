@@ -63,23 +63,14 @@
                 </div>
 
 <div class="mt-2 d-flex gap-2 flex-wrap">
-    <button class="btn btn-sm btn-outline-secondary"
-            @onclick="ToggleShowOk">
-        @(_showOkCustomers ? "Skjul OK" : "Vis OK")
-    </button>
-
-    <div class="btn-group" role="group" aria-label="Sortering">
-        <button class="@SortBtnClass("Kritisk først")" @onclick='() => SetSortMode("Kritisk først")'>
-            Kritisk
-        </button>
-        <button class="@SortBtnClass("Gråzone først")" @onclick='() => SetSortMode("Gråzone først")'>
-            Gråzone
-        </button>
-        <button class="@SortBtnClass("OK først")" @onclick='() => SetSortMode("OK først")'>
-            OK
-        </button>
+    <div class="btn-group" role="group" aria-label="Filter">
+        <button class="@ZoneBtnClass("Kritisk")" @onclick='() => SetZone("Kritisk")'>Kritisk</button>
+        <button class="@ZoneBtnClass("Gråzone")" @onclick='() => SetZone("Gråzone")'>Gråzone</button>
+        <button class="@ZoneBtnClass("OK")"      @onclick='() => SetZone("OK")'>OK</button>
+        <button class="@ZoneBtnClass("Alle")"    @onclick='() => SetZone("Alle")'>Alle</button>
     </div>
 </div>
+
 
 
                 <div class="mt-3" style="max-height:70vh; overflow:auto;">
@@ -656,9 +647,11 @@
         await LoadSummaries();
     }
 
-    private void SetSortMode(string mode) => _sortMode = mode;
+private string _zone = "Alle";
 
-private string SortBtnClass(string mode)
-    => "btn btn-sm " + (_sortMode == mode ? "btn-primary" : "btn-outline-secondary");
+private void SetZone(string z) => _zone = z;
+
+private string ZoneBtnClass(string z)
+    => "btn btn-sm " + (_zone == z ? "btn-primary" : "btn-outline-secondary");
 
 }
