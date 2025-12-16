@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.ML;
 
 namespace DNDProject.Api.ML;
@@ -47,20 +50,25 @@ public sealed class MLTrainerService
 
         rows = MLCore.ClipLabelOutliers(rows, p: 0.99);
 
-        // 4) Split 80/20
-        const double testFraction = 0.2;
-        int n = rows.Count;
-        int testCount = (int)Math.Round(n * testFraction);
-        testCount = Math.Max(1, Math.Min(testCount, n - 1));
+        // 4) Split 60/20/20 (train/val/test) – shuffle først
+        var rnd = new Random(42);
+        rows = rows.OrderBy(_ => rnd.Next()).ToList();
 
-        var trainRows = rows.Take(n - testCount).ToList();
-        var testRows = rows.Skip(n - testCount).ToList();
+        int n = rows.Count;
+        int trainCount = (int)(n * 0.60);
+        int valCount   = (int)(n * 0.20);
+        int testCount  = n - trainCount - valCount; // resten
+
+        var trainRows = rows.Take(trainCount).ToList();
+        var valRows   = rows.Skip(trainCount).Take(valCount).ToList();
+        var testRows  = rows.Skip(trainCount + valCount).Take(testCount).ToList();
 
         // 5) Train FastTree
         var ml = new MLContext(seed: 42);
 
         var trainView = ml.Data.LoadFromEnumerable(trainRows.Select(MLCore.ToModelInput));
-        var testView = ml.Data.LoadFromEnumerable(testRows.Select(MLCore.ToModelInput));
+        var valView   = ml.Data.LoadFromEnumerable(valRows.Select(MLCore.ToModelInput));
+        var testView  = ml.Data.LoadFromEnumerable(testRows.Select(MLCore.ToModelInput));
 
         var basePipe =
             ml.Transforms.Categorical.OneHotEncoding("SkabelonnrOneHot", nameof(MLCore.ModelInput.Skabelonnr))
@@ -84,16 +92,21 @@ public sealed class MLTrainerService
 
         var model = basePipe.Append(trainer).Fit(trainView);
 
+        // Validation metrics (til info)
+        var valPred = model.Transform(valView);
+        var valMetrics = ml.Regression.Evaluate(valPred, labelColumnName: "Label", scoreColumnName: "Score");
+
+        // Test metrics (det vi returnerer)
         var testPred = model.Transform(testView);
-        var metrics = ml.Regression.Evaluate(testPred, labelColumnName: "Label", scoreColumnName: "Score");
+        var testMetrics = ml.Regression.Evaluate(testPred, labelColumnName: "Label", scoreColumnName: "Score");
 
         return new TrainResult(
             Rows: rows.Count,
-            TestFraction: testFraction,
-            Mae: metrics.MeanAbsoluteError,
-            Rmse: metrics.RootMeanSquaredError,
-            Rsquared: metrics.RSquared,
-            Message: "OK"
+            TestFraction: 0.20,
+            Mae: testMetrics.MeanAbsoluteError,
+            Rmse: testMetrics.RootMeanSquaredError,
+            Rsquared: testMetrics.RSquared,
+            Message: $"OK | split=60/20/20 | val: MAE={valMetrics.MeanAbsoluteError:0.###}, RMSE={valMetrics.RootMeanSquaredError:0.###}, R²={valMetrics.RSquared:0.###}"
         );
     }
 
