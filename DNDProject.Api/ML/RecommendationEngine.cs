@@ -43,6 +43,9 @@ public sealed class RecommendationEngine
         EngineResult? best = null;
         double bestScore = double.PositiveInfinity;
 
+        // ✅ NYT: tolerance til tie-break (stabilitet)
+        const double TieEps = 0.05; // “næsten lige gode” løsninger behandles som tie
+
         foreach (var size in Sizes)
         {
             for (int count = 1; count <= maxContainers; count++)
@@ -76,15 +79,13 @@ public sealed class RecommendationEngine
                     size <= 240 ? Math.Max(0, count - 6) * 1.2 : 0.0;
 
                 // Lille straf for store containere (så 1100 ikke altid vinder)
-                // (men den er lille nok til at 1100 stadig vinder når den er klart bedst)
                 double sizePenalty =
                     size == 1100 ? 0.20 :
                     size == 660 ? 0.10 :
                     size == 240 ? 0.05 :
                     0.02;
 
-                // Bonus (lille) hvis vi holder os under 100% (psykologisk/realistisk)
-                // (Gør at 0.99 ofte slår 1.03 hvis alt andet er lige)
+                // Bonus (lille) hvis vi holder os under 100%
                 double under100Bonus = expectedFill <= 1.0 ? -0.10 : 0.0;
 
                 var score =
@@ -96,7 +97,28 @@ public sealed class RecommendationEngine
                     sizePenalty +
                     under100Bonus;
 
-                if (score < bestScore)
+                // ✅ NYT: stabil tie-breaker når score næsten er ens:
+                //  1) færre containere (plads/logistik)
+                //  2) større størrelse (færre enheder i praksis)
+                //  3) tættere på targetFill
+                bool isBetter =
+                    score < bestScore - 1e-12;
+
+                bool isTieButPreferThis = false;
+                if (!isBetter && best is not null && Math.Abs(score - bestScore) <= TieEps)
+                {
+                    if (count < best.ContainerCount) isTieButPreferThis = true;
+                    else if (count == best.ContainerCount && size > best.ContainerSize) isTieButPreferThis = true;
+                    else if (count == best.ContainerCount && size == best.ContainerSize)
+                    {
+                        // samme setup, vælg den der er tættest på target (burde være identisk, men safe)
+                        var thisDist = Math.Abs(expectedFill - targetFill);
+                        var bestDist = Math.Abs(best.ExpectedFill - targetFill);
+                        if (thisDist < bestDist) isTieButPreferThis = true;
+                    }
+                }
+
+                if (isBetter || isTieButPreferThis)
                 {
                     bestScore = score;
                     best = new EngineResult(size, count, frequencyDays, expectedFill);
