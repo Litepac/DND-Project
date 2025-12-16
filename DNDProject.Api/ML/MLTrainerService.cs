@@ -15,6 +15,18 @@ public sealed class MLTrainerService
         _data = data;
     }
 
+    // -----------------------------
+    // In-memory cache (static = deles på tværs af service instances)
+    // -----------------------------
+    private static readonly object _cacheLock = new();
+
+    private static ITransformer? _cachedModel;
+    private static Dictionary<string, double>? _cachedResidualStdBySk;
+    private static DateTime _cachedTrainedAtUtc;
+    private static DateTime _cachedFrom;
+    private static DateTime _cachedTo;
+    private static string _cachedDesc = "";
+
     // A) Train metrics (samme struktur som swagger)
     public sealed record TrainResult(
         int Rows,
@@ -25,6 +37,9 @@ public sealed class MLTrainerService
         string Message
     );
 
+    // -----------------------------
+    // A) Train + tune + cache model
+    // -----------------------------
     public async Task<TrainResult> TrainAsync(DateTime from, DateTime to)
     {
         // 1) Hent daily fra DB
@@ -57,13 +72,13 @@ public sealed class MLTrainerService
         int n = rows.Count;
         int trainCount = (int)(n * 0.60);
         int valCount   = (int)(n * 0.20);
-        int testCount  = n - trainCount - valCount; // resten
+        int testCount  = n - trainCount - valCount;
 
         var trainRows = rows.Take(trainCount).ToList();
         var valRows   = rows.Skip(trainCount).Take(valCount).ToList();
         var testRows  = rows.Skip(trainCount + valCount).Take(testCount).ToList();
 
-        // 5) Train FastTree
+        // 5) ML
         var ml = new MLContext(seed: 42);
 
         var trainView = ml.Data.LoadFromEnumerable(trainRows.Select(MLCore.ToModelInput));
@@ -84,21 +99,73 @@ public sealed class MLTrainerService
                   nameof(MLCore.ModelInput.TrendKgDay_Last5)
               ));
 
-        var trainer = ml.Regression.Trainers.FastTree(
-            numberOfLeaves: 50,
-            numberOfTrees: 500,
-            minimumExampleCountPerLeaf: 5,
-            learningRate: 0.03f);
+        // Kandidater (tuning på VAL_MAE)
+        var candidates = new (int leaves, int trees, int minLeaf, float lr)[]
+        {
+            (20,  300, 10, 0.05f),
+            (50,  500,  5, 0.03f),
+            (80,  800,  5, 0.02f),
+            (100, 1200, 10, 0.015f),
+        };
 
-        var model = basePipe.Append(trainer).Fit(trainView);
+        (int leaves, int trees, int minLeaf, float lr) best = candidates[0];
+        double bestValMae = double.PositiveInfinity;
+        double bestValRmse = 0;
+        double bestValR2 = 0;
 
-        // Validation metrics (til info)
-        var valPred = model.Transform(valView);
-        var valMetrics = ml.Regression.Evaluate(valPred, labelColumnName: "Label", scoreColumnName: "Score");
+        foreach (var c in candidates)
+        {
+            var trainer = ml.Regression.Trainers.FastTree(
+                numberOfLeaves: c.leaves,
+                numberOfTrees: c.trees,
+                minimumExampleCountPerLeaf: c.minLeaf,
+                learningRate: c.lr);
 
-        // Test metrics (det vi returnerer)
-        var testPred = model.Transform(testView);
+            var model = basePipe.Append(trainer).Fit(trainView);
+
+            var valPred = model.Transform(valView);
+            var valMetrics = ml.Regression.Evaluate(valPred, labelColumnName: "Label", scoreColumnName: "Score");
+
+            if (valMetrics.MeanAbsoluteError < bestValMae)
+            {
+                bestValMae = valMetrics.MeanAbsoluteError;
+                bestValRmse = valMetrics.RootMeanSquaredError;
+                bestValR2 = valMetrics.RSquared;
+                best = c;
+            }
+        }
+
+        var bestDesc = $"FastTree leaves={best.leaves} trees={best.trees} minLeaf={best.minLeaf} lr={best.lr}";
+
+        // 6) Retrain FINAL model på train + val
+        var trainPlusValRows = trainRows.Concat(valRows).ToList();
+        var trainPlusValView = ml.Data.LoadFromEnumerable(trainPlusValRows.Select(MLCore.ToModelInput));
+
+        var finalTrainer = ml.Regression.Trainers.FastTree(
+            numberOfLeaves: best.leaves,
+            numberOfTrees: best.trees,
+            minimumExampleCountPerLeaf: best.minLeaf,
+            learningRate: best.lr);
+
+        var finalModel = basePipe.Append(finalTrainer).Fit(trainPlusValView);
+
+        // 7) Test metrics
+        var testPred = finalModel.Transform(testView);
         var testMetrics = ml.Regression.Evaluate(testPred, labelColumnName: "Label", scoreColumnName: "Score");
+
+        // 8) Compute residual std på samme data som final modellen er trænet på (train+val)
+        var residualStdBySk = MLCore.ComputeResidualStdBySkabelonnr(ml, finalModel, trainPlusValRows);
+
+        // 9) CACHE i memory (thread-safe)
+        lock (_cacheLock)
+        {
+            _cachedModel = finalModel;
+            _cachedResidualStdBySk = residualStdBySk;
+            _cachedTrainedAtUtc = DateTime.UtcNow;
+            _cachedFrom = from.Date;
+            _cachedTo = to.Date;
+            _cachedDesc = $"CACHED | {bestDesc} | trainedAtUtc={_cachedTrainedAtUtc:O} | range={_cachedFrom:yyyy-MM-dd}..{_cachedTo:yyyy-MM-dd}";
+        }
 
         return new TrainResult(
             Rows: rows.Count,
@@ -106,12 +173,12 @@ public sealed class MLTrainerService
             Mae: testMetrics.MeanAbsoluteError,
             Rmse: testMetrics.RootMeanSquaredError,
             Rsquared: testMetrics.RSquared,
-            Message: $"OK | split=60/20/20 | val: MAE={valMetrics.MeanAbsoluteError:0.###}, RMSE={valMetrics.RootMeanSquaredError:0.###}, R²={valMetrics.RSquared:0.###}"
+            Message: $"OK | split=60/20/20 | BEST={bestDesc} | VAL: MAE={bestValMae:0.###}, RMSE={bestValRmse:0.###}, R²={bestValR2:0.###} | {_cachedDesc}"
         );
     }
 
     // -----------------------------
-    // B) Recommendations (predict -> container+frekvens)
+    // B) Recommendations (bruger cached model hvis muligt)
     // -----------------------------
     public sealed record RecommendRow(
         string CustomerNo,
@@ -125,6 +192,31 @@ public sealed class MLTrainerService
 
     public async Task<List<RecommendRow>> RecommendAsync(DateTime from, DateTime to, int take = 500)
     {
+        // 0) Sørg for at vi har en cached model
+        ITransformer? model;
+        Dictionary<string, double>? residualStdBySk;
+        lock (_cacheLock)
+        {
+            model = _cachedModel;
+            residualStdBySk = _cachedResidualStdBySk;
+        }
+
+        // Hvis ingen model endnu: træn én gang og cache
+        if (model is null || residualStdBySk is null)
+        {
+            await TrainAsync(from, to);
+
+            lock (_cacheLock)
+            {
+                model = _cachedModel;
+                residualStdBySk = _cachedResidualStdBySk;
+            }
+
+            if (model is null || residualStdBySk is null)
+                return new(); // burde ikke ske, men safe fallback
+        }
+
+        // 1) Hent daily fra DB (du bruger stadig den aktuelle periode som input til features)
         var dailyDb = await _data.LoadDailyPickupsAsync(from, to);
 
         var daily = dailyDb.Select(x => new MLCore.PickupDaily(
@@ -133,6 +225,7 @@ public sealed class MLTrainerService
 
         if (daily.Count < 50) return new();
 
+        // 2) Feature engineering til prediction inputs
         var rows = MLCore.BuildTrainingRowsWithRolling(daily);
         if (rows.Count < 300) return new();
 
@@ -140,32 +233,7 @@ public sealed class MLTrainerService
 
         var ml = new MLContext(seed: 42);
 
-        var view = ml.Data.LoadFromEnumerable(rows.Select(MLCore.ToModelInput));
-
-        var pipe =
-            ml.Transforms.Categorical.OneHotEncoding("SkabelonnrOneHot", nameof(MLCore.ModelInput.Skabelonnr))
-              .Append(ml.Transforms.Concatenate("Features",
-                  "SkabelonnrOneHot",
-                  nameof(MLCore.ModelInput.DaysSincePrev),
-                  nameof(MLCore.ModelInput.Month),
-                  nameof(MLCore.ModelInput.Weekday),
-                  nameof(MLCore.ModelInput.PrevCollectedKg),
-                  nameof(MLCore.ModelInput.AvgKgDay_Last3),
-                  nameof(MLCore.ModelInput.AvgKgDay_Last5),
-                  nameof(MLCore.ModelInput.StdKgDay_Last5),
-                  nameof(MLCore.ModelInput.TrendKgDay_Last5)
-              ))
-              .Append(ml.Regression.Trainers.FastTree(
-                  numberOfLeaves: 50,
-                  numberOfTrees: 500,
-                  minimumExampleCountPerLeaf: 5,
-                  learningRate: 0.03f));
-
-        var model = pipe.Fit(view);
-
-        // safety via residual std
-        var residualStdBySk = MLCore.ComputeResidualStdBySkabelonnr(ml, model, rows);
-
+        // 3) Seneste row pr (customer, skabelon)
         var latestByCustomer = rows
             .Where(r => !string.IsNullOrWhiteSpace(r.CustomerNo))
             .GroupBy(r => (r.CustomerNo, r.CustomerName))
@@ -185,6 +253,7 @@ public sealed class MLTrainerService
         {
             var inputs = c.Rows.Select(MLCore.ToModelInputNoLabel).ToList();
             var dv = ml.Data.LoadFromEnumerable(inputs);
+
             var pred = model.Transform(dv);
             var preds = ml.Data.CreateEnumerable<MLCore.ModelOutput>(pred, reuseRowObject: false).ToList();
 
