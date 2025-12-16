@@ -1,7 +1,130 @@
 @page "/"
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider Auth
+
+<div class="container py-4" style="max-width: 1100px;">
+
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Stena Smart Collection</h2>
+            <div class="text-muted">
+                Vælg en feature for at komme i gang.
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick='() => Go("ml-customers")'>ML – Top kunder</button>
+            <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Kunde-dashboard</button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- Kunde-dashboard -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="fw-bold">Kunde-dashboard</div>
+                        <span class="badge bg-secondary">Overview</span>
+                    </div>
+                    <div class="text-muted small mb-3">
+                        Overblik over kunder, nøgletal og performance.
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" @onclick='() => Go("customer-dashboard")'>Åbn</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tømningsanalyse -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="fw-bold">Tømningsanalyse</div>
+                        <span class="badge bg-secondary">Analytics</span>
+                    </div>
+                    <div class="text-muted small mb-3">
+                        Se ineffektiv afhentning og forbedringspotentiale.
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary" @onclick='() => Go("container-efficiency")'>Åbn</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ML -->
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="fw-bold">ML – Top kunder</div>
+                        <span class="badge bg-primary">ML</span>
+                    </div>
+                    <div class="text-muted small mb-3">
+                        Få anbefalet frekvens + containeropsætning. Inkl. manual beregner og print/PDF.
+                    </div>
+                    <button class="btn btn-sm btn-primary" @onclick='() => Go("ml-customers")'>Åbn</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Highlights -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="mb-2">Hurtigt overblik</h5>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 rounded border">
+                                <div class="fw-bold mb-1">ML-anbefaling</div>
+                                <div class="text-muted small">
+                                    Predikér kg/dag og få container + frekvens.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 rounded border">
+                                <div class="fw-bold mb-1">Business & ESG</div>
+                                <div class="text-muted small">
+                                    Sammenlign før/efter på ture, CO₂ og omkostning pr. år.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="p-3 rounded border">
+                                <div class="fw-bold mb-1">Manual beregner</div>
+                                <div class="text-muted small">
+                                    Justér antal/størrelse/frekvens og se fill %.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3" />
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-outline-primary" @onclick='() => Go("ml-customers")'>Gå til ML</button>
+                        <button class="btn btn-outline-secondary" @onclick='() => Go("container-efficiency")'>Gå til analyse</button>
+                        <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Gå til dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
 
 @code {
-    protected override void OnInitialized()
-        => Nav.NavigateTo("/login", replace: true);
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var user = state.User;
+
+        if (user?.Identity?.IsAuthenticated != true)
+            Nav.NavigateTo("/login", replace: true);
+    }
+
+    void Go(string path) => Nav.NavigateTo("/" + path.TrimStart('/'));
 }
