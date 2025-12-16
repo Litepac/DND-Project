@@ -1,0 +1,92 @@
+@using System.Globalization
+
+<div class="card h-100">
+    <div class="card-body">
+        <h5 class="mb-3">Manuel beregner</h5>
+
+        <div class="row g-2">
+            <div class="col-6">
+                <label class="form-label">Kg pr. dag</label>
+                <input class="form-control" type="number" step="0.01" @bind="KgPerDay" />
+            </div>
+
+            <div class="col-6">
+                <label class="form-label">Densitet (kg/L)</label>
+                <input class="form-control" type="number" step="0.01" @bind="DensityKgPerLiter" />
+            </div>
+
+            <div class="col-6">
+                <label class="form-label">Frekvens (dage)</label>
+                <input class="form-control" type="number" step="1" min="1" max="90" @bind="FrequencyDays" />
+            </div>
+
+            <div class="col-6">
+                <label class="form-label">Antal containere</label>
+                <input class="form-control" type="number" step="1" min="1" max="30" @bind="ContainerCount" />
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Container størrelse (L)</label>
+                <select class="form-select" @bind="ContainerSizeLiters">
+                    @foreach (var s in AllowedSizes)
+                    {
+                        <option value="@s">@s L</option>
+                    }
+                </select>
+                <div class="form-text">Låst til: 120, 240, 660, 1100</div>
+            </div>
+        </div>
+
+        <hr class="my-3" />
+
+        @{
+            var fill = ExpectedFill();
+            var fillPct = fill * 100.0;
+        }
+
+        <div class="alert alert-info mb-0">
+            <div><b>Expected fill:</b> @fill.ToString("0.###", CultureInfo.InvariantCulture)</div>
+            <div><b>Expected fill %:</b> @fillPct.ToString("0.##", CultureInfo.InvariantCulture) %</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly int[] AllowedSizes = { 120, 240, 660, 1100 };
+
+    [Parameter] public double InitialKgPerDay { get; set; } = 25;
+    [Parameter] public double InitialDensityKgPerLiter { get; set; } = 0.13;
+    [Parameter] public int InitialFrequencyDays { get; set; } = 7;
+    [Parameter] public int InitialContainerSizeLiters { get; set; } = 660;
+    [Parameter] public int InitialContainerCount { get; set; } = 1;
+
+    double KgPerDay { get; set; }
+    double DensityKgPerLiter { get; set; }
+    int FrequencyDays { get; set; }
+    int ContainerSizeLiters { get; set; }
+    int ContainerCount { get; set; }
+
+    protected override void OnInitialized()
+    {
+        KgPerDay = InitialKgPerDay;
+        DensityKgPerLiter = InitialDensityKgPerLiter;
+        FrequencyDays = InitialFrequencyDays;
+        ContainerCount = InitialContainerCount;
+        ContainerSizeLiters = AllowedSizes.Contains(InitialContainerSizeLiters) ? InitialContainerSizeLiters : 660;
+    }
+
+    double ExpectedFill()
+    {
+        var kgPerDay = Math.Max(0, KgPerDay);
+        var dens = DensityKgPerLiter > 0 ? DensityKgPerLiter : 0.13;
+        var freq = Math.Clamp(FrequencyDays, 1, 90);
+        var cnt = Math.Clamp(ContainerCount, 1, 30);
+        var size = AllowedSizes.Contains(ContainerSizeLiters) ? ContainerSizeLiters : 660;
+
+        var litersPerDay = kgPerDay / dens;
+        var litersPerPickup = litersPerDay * freq;
+        var totalCapacity = cnt * (double)size;
+
+        return totalCapacity <= 0 ? 0 : litersPerPickup / totalCapacity;
+    }
+}

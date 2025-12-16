@@ -1,6 +1,7 @@
 @page "/ml-customer/{CustomerNo}"
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
+@using DNDProject.Web.Components
 @inject HttpClient Http
 @inject DNDProject.Web.Services.ITokenStorage Tokens
 @inject NavigationManager Nav
@@ -19,191 +20,210 @@ else if (busy)
 }
 else if (rec is not null)
 {
-    <div class="card mb-3" style="max-width:920px;">
-        <div class="card-body">
-            <h5 class="card-title mb-1">@rec.CustomerName</h5>
-            <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
+    <div style="max-width:920px;">
 
-            <dl class="row mb-0">
-                <dt class="col-sm-4">Container</dt>
-                <dd class="col-sm-8">@rec.ContainerCount × @rec.ContainerL L</dd>
+        <!-- TOP: ML recommendation + manual calculator side by side -->
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-1">@rec.CustomerName</h5>
+                        <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
 
-                <dt class="col-sm-4">Frekvens</dt>
-                <dd class="col-sm-8">Hver @rec.FrequencyDays dage</dd>
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Container</dt>
+                            <dd class="col-sm-8">@rec.ContainerCount × @rec.ContainerL L</dd>
 
-                <dt class="col-sm-4">Expected fill</dt>
-                <dd class="col-sm-8">@rec.ExpectedFill.ToString("P0")</dd>
+                            <dt class="col-sm-4">Frekvens</dt>
+                            <dd class="col-sm-8">Hver @rec.FrequencyDays dage</dd>
 
-                <dt class="col-sm-4">Pred kg/dag (safe)</dt>
-                <dd class="col-sm-8">@rec.PredKgPerDaySafe.ToString("N0")</dd>
-            </dl>
+                            <dt class="col-sm-4">Expected fill</dt>
+                            <dd class="col-sm-8">@rec.ExpectedFill.ToString("P0")</dd>
 
-            <hr />
+                            <dt class="col-sm-4">Pred kg/dag (safe)</dt>
+                            <dd class="col-sm-8">@rec.PredKgPerDaySafe.ToString("N0")</dd>
+                        </dl>
 
-            <div class="small text-muted">
-                <div><b>Container</b>: foreslået antal × nominelt volumen (L) for restaffald.</div>
-                <div><b>Frekvens</b>: foreslået antal dage mellem tømninger.</div>
-                <div><b>Expected fill</b>: estimeret fyldningsgrad ved tømning (volumen-baseret antagelse).</div>
-                <div><b>Pred kg/dag (safe)</b>: konservativt estimat for gennemsnitlig kg pr. dag baseret på historik/model.</div>
+                        <hr />
+
+                        <div class="small text-muted">
+                            <div><b>Container</b>: foreslået antal × nominelt volumen (L) for restaffald.</div>
+                            <div><b>Frekvens</b>: foreslået antal dage mellem tømninger.</div>
+                            <div><b>Expected fill</b>: estimeret fyldningsgrad ved tømning (volumen-baseret antagelse).</div>
+                            <div><b>Pred kg/dag (safe)</b>: konservativt estimat for gennemsnitlig kg pr. dag baseret på historik/model.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-6">
+                <ManualFillCalculator
+                    InitialKgPerDay="@(rec.PredKgPerDaySafe)"
+                    InitialDensityKgPerLiter="0.13"
+                    InitialFrequencyDays="@(rec.FrequencyDays)"
+                    InitialContainerSizeLiters="@(rec.ContainerL)"
+                    InitialContainerCount="@(rec.ContainerCount)" />
             </div>
         </div>
-    </div>
 
-    <div class="card mb-3" style="max-width:920px;">
-        <div class="card-body">
-            <h5 class="mb-1">Business & ESG impact (før / efter)</h5>
-            <div class="text-muted mb-3">
-                Viser baseline (historisk) vs anbefalet. Tallene afhænger af antagelserne (kan justeres).
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">Km pr. tur (antagelse)</label>
-                    <input class="form-control" type="number" step="1" @bind="kmPerTrip" />
-                    <div class="form-text">Brug fx gennemsnitlig rute tur/retur.</div>
+        <!-- Business + ESG -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="mb-1">Business & ESG impact (før / efter)</h5>
+                <div class="text-muted mb-3">
+                    Viser baseline (historisk) vs anbefalet. Tallene afhænger af antagelserne (kan justeres).
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">CO₂ pr. km (kg/km)</label>
-                    <input class="form-control" type="number" step="0.1" @bind="co2PerKm" />
-                    <div class="form-text">Afhænger af biltype/last. Brug et konservativt tal.</div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Km pr. tur (antagelse)</label>
+                        <input class="form-control" type="number" step="1" @bind="kmPerTrip" />
+                        <div class="form-text">Brug fx gennemsnitlig rute tur/retur.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">CO₂ pr. km (kg/km)</label>
+                        <input class="form-control" type="number" step="0.1" @bind="co2PerKm" />
+                        <div class="form-text">Afhænger af biltype/last. Brug et konservativt tal.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Omkostning pr. tur (kr)</label>
+                        <input class="form-control" type="number" step="1" @bind="costPerTrip" />
+                        <div class="form-text">Internt estimat (chauffør, bil, planlægning mv.).</div>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Omkostning pr. tur (kr)</label>
-                    <input class="form-control" type="number" step="1" @bind="costPerTrip" />
-                    <div class="form-text">Internt estimat (chauffør, bil, planlægning mv.).</div>
-                </div>
-            </div>
 
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="mb-3">Operationelt</h6>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="mb-3">Operationelt</h6>
 
-                            <div class="d-flex justify-content-between">
-                                <div>Forventede ture/år (anbefalet)</div>
-                                <div><b>@RecTripsPerYear.ToString("N0")</b></div>
+                                <div class="d-flex justify-content-between">
+                                    <div>Forventede ture/år (anbefalet)</div>
+                                    <div><b>@RecTripsPerYear.ToString("N0")</b></div>
+                                </div>
+
+                                <div class="d-flex justify-content-between">
+                                    <div>Ture/år (baseline, historisk)</div>
+                                    <div><b>@BaseTripsPerYearText</b></div>
+                                </div>
+
+                                <hr />
+
+                                <div class="d-flex justify-content-between">
+                                    <div><b>Potentiale: færre ture/år</b></div>
+                                    <div><b>@TripsSavedPerYearText</b></div>
+                                </div>
+
+                                <div class="text-muted small mt-2">
+                                    Baseline beregnes ud fra unikke “tømmedage” i perioden (restaffald via Indhold=710100).
+                                </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div class="d-flex justify-content-between">
-                                <div>Ture/år (baseline, historisk)</div>
-                                <div><b>@BaseTripsPerYearText</b></div>
-                            </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="mb-3">ESG (CO₂) & økonomi</h6>
 
-                            <hr />
+                                <div class="d-flex justify-content-between">
+                                    <div>CO₂/år (anbefalet)</div>
+                                    <div><b>@RecCo2Year.ToString("N0") kg</b></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <div>Omkostning/år (anbefalet)</div>
+                                    <div><b>@RecCostYear.ToString("N0") kr</b></div>
+                                </div>
 
-                            <div class="d-flex justify-content-between">
-                                <div><b>Potentiale: færre ture/år</b></div>
-                                <div><b>@TripsSavedPerYearText</b></div>
-                            </div>
+                                <hr />
 
-                            <div class="text-muted small mt-2">
-                                Baseline beregnes ud fra unikke “tømmedage” i perioden (restaffald via Indhold=710100).
+                                <div class="d-flex justify-content-between">
+                                    <div>CO₂/år (baseline)</div>
+                                    <div><b>@BaseCo2YearText</b></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <div>Omkostning/år (baseline)</div>
+                                    <div><b>@BaseCostYearText</b></div>
+                                </div>
+
+                                <hr />
+
+                                <div class="d-flex justify-content-between">
+                                    <div><b>Potentiale CO₂/år</b></div>
+                                    <div><b>@Co2SavedYearText</b></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <div><b>Potentiale kr/år</b></div>
+                                    <div><b>@CostSavedYearText</b></div>
+                                </div>
+
+                                <div class="text-muted small mt-2">
+                                    Estimatet fokuserer på transport/indsamling (Scope 1/3 afhænger af jeres ESG-ramme).
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="mb-3">ESG (CO₂) & økonomi</h6>
-
-                            <div class="d-flex justify-content-between">
-                                <div>CO₂/år (anbefalet)</div>
-                                <div><b>@RecCo2Year.ToString("N0") kg</b></div>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <div>Omkostning/år (anbefalet)</div>
-                                <div><b>@RecCostYear.ToString("N0") kr</b></div>
-                            </div>
-
-                            <hr />
-
-                            <div class="d-flex justify-content-between">
-                                <div>CO₂/år (baseline)</div>
-                                <div><b>@BaseCo2YearText</b></div>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <div>Omkostning/år (baseline)</div>
-                                <div><b>@BaseCostYearText</b></div>
-                            </div>
-
-                            <hr />
-
-                            <div class="d-flex justify-content-between">
-                                <div><b>Potentiale CO₂/år</b></div>
-                                <div><b>@Co2SavedYearText</b></div>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <div><b>Potentiale kr/år</b></div>
-                                <div><b>@CostSavedYearText</b></div>
-                            </div>
-
-                            <div class="text-muted small mt-2">
-                                Estimatet fokuserer på transport/indsamling (Scope 1/3 afhænger af jeres ESG-ramme).
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mt-3">
-                <div class="card-body">
-                    <h6 class="mb-2">Sanity-check (restaffald, volumen-antagelse)</h6>
-
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="text-muted small">Antaget densitet</div>
-                            <div><b>@densityKgPerL.ToString("0.##") kg/L</b></div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted small">Est. volumen pr. dag</div>
-                            <div><b>@EstLitersPerDay.ToString("N0") L/dag</b></div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted small">Est. fyldning pr. tømning</div>
-                            <div><b>@EstFillAtPickup.ToString("P0")</b></div>
-                        </div>
-                    </div>
-
-                    <div class="text-muted small mt-2">
-                        Hurtig plausibilitetscheck: (kg/dag → liter/dag) sammenholdt med containerkapacitet og frekvens.
-                    </div>
-                </div>
-            </div>
-
-            @if (baseline is not null && baseline.TripDays > 0)
-            {
                 <div class="card mt-3">
                     <div class="card-body">
-                        <h6 class="mb-2">Baseline nøgletal (historisk)</h6>
+                        <h6 class="mb-2">Sanity-check (restaffald, volumen-antagelse)</h6>
+
                         <div class="row">
                             <div class="col-md-4">
-                                <div class="text-muted small">Tømmedage i perioden</div>
-                                <div><b>@baseline.TripDays</b></div>
+                                <div class="text-muted small">Antaget densitet</div>
+                                <div><b>@densityKgPerL.ToString("0.##") kg/L</b></div>
                             </div>
                             <div class="col-md-4">
-                                <div class="text-muted small">Total kg (rest) i perioden</div>
-                                <div><b>@baseline.TotalKg.ToString("N0")</b></div>
+                                <div class="text-muted small">Est. volumen pr. dag</div>
+                                <div><b>@EstLitersPerDay.ToString("N0") L/dag</b></div>
                             </div>
                             <div class="col-md-4">
-                                <div class="text-muted small">Kg pr. “tømmedag” (proxy)</div>
-                                <div><b>@baseline.AvgKgPerTrip.ToString("N0")</b></div>
+                                <div class="text-muted small">Est. fyldning pr. tømning</div>
+                                <div><b>@EstFillAtPickup.ToString("P0")</b></div>
                             </div>
                         </div>
+
                         <div class="text-muted small mt-2">
-                            Baseline er et “proxy” baseret på registrerede modtagelseslinjer pr. dato (ikke kontrakt/faktisk stop-tælling).
+                            Hurtig plausibilitetscheck: (kg/dag → liter/dag) sammenholdt med containerkapacitet og frekvens.
                         </div>
                     </div>
                 </div>
-            }
-        </div>
-    </div>
 
-    <div class="d-flex gap-2" style="max-width:920px;">
-        <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
-        <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
+                @if (baseline is not null && baseline.TripDays > 0)
+                {
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <h6 class="mb-2">Baseline nøgletal (historisk)</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Tømmedage i perioden</div>
+                                    <div><b>@baseline.TripDays</b></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Total kg (rest) i perioden</div>
+                                    <div><b>@baseline.TotalKg.ToString("N0")</b></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small">Kg pr. “tømmedag” (proxy)</div>
+                                    <div><b>@baseline.AvgKgPerTrip.ToString("N0")</b></div>
+                                </div>
+                            </div>
+                            <div class="text-muted small mt-2">
+                                Baseline er et “proxy” baseret på registrerede modtagelseslinjer pr. dato (ikke kontrakt/faktisk stop-tælling).
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
+            <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
+        </div>
+
     </div>
 }
 else
