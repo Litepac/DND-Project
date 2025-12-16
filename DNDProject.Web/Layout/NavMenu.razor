@@ -21,7 +21,8 @@
 
         @if (!string.IsNullOrWhiteSpace(email))
         {
-            <div class="px-3 py-3" style="color: rgba(255,255,255,.85); border-bottom: 1px solid rgba(255,255,255,.12);">
+            <div class="px-3 py-3"
+                 style="color: rgba(255,255,255,.85); border-bottom: 1px solid rgba(255,255,255,.12);">
                 <div style="font-size:.9rem; font-weight:600;">@email</div>
                 @if (roles?.Count > 0)
                 {
@@ -31,7 +32,7 @@
         }
 
         <div class="nav-item px-3 pt-2">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <NavLink class="nav-link" href="home" Match="NavLinkMatch.All">
                 <span class="bi bi-house" aria-hidden="true"></span> Forside
             </NavLink>
         </div>

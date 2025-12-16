@@ -68,8 +68,8 @@
             // Gem token + opdater Blazor auth-state
             await AuthState.MarkUserAsAuthenticatedAsync(dto.Token);
 
-            // Efter login -> gå til forsiden
-            Nav.NavigateTo("/", replace: true);
+            // Efter login -> gå til forsiden (/home)
+            Nav.NavigateTo("/home", replace: true);
         }
         catch (Exception ex)
         {
