@@ -81,6 +81,7 @@
     </div>
 </div>
 
+
                 <div class="mt-3" style="max-height:70vh; overflow:auto;">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light sticky-top">
@@ -163,7 +164,7 @@
                 {
                     var d = _details;
                     var latest = LatestEmpty;
-                    var avgFillUi = AvgFillForUi; // ✅ beregnet fra sanitiserede empties
+                    var avgFillUi = AvgFillForUi; 
                     var isOk = avgFillUi >= d.ThresholdPct;
 
                     <div class="d-flex justify-content-between align-items-start">
@@ -259,7 +260,6 @@
                         </div>
                     </div>
 
-                    <!-- ✅ V2: MÅNEDSOVERSIGT = HOVEDSIGNAL -->
                     <div class="border rounded p-2 mt-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-muted small">Månedsoversigt (stabilitet)</div>
@@ -299,7 +299,6 @@
                         </div>
                     </div>
 
-                    <!-- ✅ V2: RÅ LISTE = COLLAPSIBLE -->
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <h6 class="mb-0">Seneste tømninger</h6>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleShowAllEmpties">
@@ -407,7 +406,6 @@
             var empties = _details?.Empties ?? new List<ContainerEmptyingDto>();
             if (!_excludeOutliersFromKpis) return empties;
 
-            // ✅ Ignorer outliers i KPI/månedsoversigt (men behold dem i rå-liste)
             return empties.Where(e => !IsOutlierFill(e.FillPct));
         }
     }
@@ -419,7 +417,6 @@
             var e = EmptiesForStats.ToList();
             if (e.Count == 0) return 0;
 
-            // ✅ Cap fill før gennemsnit, så KPI ikke eksploderer
             return e.Average(x => CapFill(x.FillPct));
         }
     }
@@ -512,7 +509,7 @@
                     var underCount = g.Count(x => x.FillPct < thr);
                     var underPct = count == 0 ? 0 : (underCount * 100.0 / count);
 
-                    // ✅ cap før gennemsnit
+            
                     var avgFill = g.Average(x => CapFill(x.FillPct));
 
                     string badgeClass;
