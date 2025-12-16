@@ -109,8 +109,8 @@
                                         <td>
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <span>@c.CustomerName</span>
-                                                <span class="badge @ZoneBadgeClass(c.AvgFillPct)">
-                                                    @ZoneLabel(c.AvgFillPct)
+                                                <span class="badge @ZoneBadgeClass(c.AvgFillPct, _thresholdPct)">
+                                                    @ZoneLabel(c.AvgFillPct, _thresholdPct)
                                                 </span>
                                             </div>
                                         </td>
@@ -203,8 +203,19 @@
                                 @if (latest != null)
                                 {
                                     <div class="text-muted small">
-                                        Seneste: @latest.Date.ToString("yyyy-MM-dd") (@latest.FillPct.ToString("N1")%)
+                                        Seneste: @latest.Date.ToString("yyyy-MM-dd") (@FillLabel(latest.FillPct))
                                     </div>
+                                }
+
+                                @if (d.Empties != null)
+                                {
+                                    var outliers = d.Empties.Count(x => x.FillPct > MaxDisplayFillPct);
+                                    if (outliers > 0)
+                                    {
+                                        <div class="text-muted small">
+                                            Datakvalitet: <b>@outliers</b> outlier(s) (&gt; @MaxDisplayFillPct%)
+                                        </div>
+                                    }
                                 }
                             </div>
                         </div>
@@ -288,21 +299,28 @@
                     <div style="max-height:40vh; overflow:auto;">
                         @foreach (var e in VisibleEmpties)
                         {
-                            var zoneClass = FillClass(e.FillPct, d.ThresholdPct);
+                            var raw = (double)e.FillPct;
+                            var capped = CapFill(raw);
+                            var zoneClass = FillClass(raw, d.ThresholdPct);
+                            var outlier = IsOutlierFill(raw);
 
                             <div class="mb-2">
                                 <div class="d-flex justify-content-between small">
                                     <span class="text-muted">@e.Date.ToString("yyyy-MM-dd")</span>
                                     <span class="fw-semibold">
                                         @e.WeightKg.ToString("N1") kg
-                                        <span class="text-muted">(@e.FillPct.ToString("N1")%)</span>
+                                        <span class="text-muted">(@FillLabel(raw))</span>
                                     </span>
                                 </div>
 
+                                @if (outlier)
+                                {
+                                    <div class="text-muted small mb-1">@FillSubLabel(raw)</div>
+                                }
+
                                 <div class="progress" style="height:10px;">
                                     <div class="progress-bar @zoneClass"
-                                         style="width:@Math.Clamp(e.FillPct, 0, 150)%">
-                                    </div>
+                                         style="width:@capped%"></div>
                                 </div>
                             </div>
                         }
@@ -332,6 +350,24 @@
     private bool _showAllEmpties = false;
     private bool _showOkCustomers = false;
     private string _sortMode = "Kritisk først"; // "Kritisk først" -> "Gråzone først" -> "OK først"
+
+    // ---------------------------
+    // UI-sanity: fyld% kan være >100% pga. sammentælling/bulk.
+    // Vi viser capped i UI, men markerer outliers.
+    // ---------------------------
+    private const double MaxDisplayFillPct = 150.0; // UI cap (alt over = outlier/warning)
+
+    private static double CapFill(double raw) => Math.Clamp(raw, 0.0, MaxDisplayFillPct);
+    private static bool IsOutlierFill(double raw) => raw > MaxDisplayFillPct;
+
+    private static string FillLabel(double raw)
+    {
+        var capped = CapFill(raw);
+        return IsOutlierFill(raw) ? $"{capped:N1}% ⚠" : $"{capped:N1}%";
+    }
+
+    private static string FillSubLabel(double raw) =>
+        IsOutlierFill(raw) ? $"Rå: {raw:N1}% (sandsynlig sammentælling/bulk)" : "";
 
     protected override async Task OnInitializedAsync()
         => await LoadSummaries();
@@ -363,10 +399,9 @@
             }
 
             // score = kombiner “hvor lav fyldning” + “hvor ofte under grænse”
-            // lav fyldning vægtes højere end pct under grænse, fordi det siger mere om behovet.
             double Score(ContainerEfficiencyCustomerSummaryDto c)
             {
-                var lowFill = Math.Max(0, _thresholdPct - c.AvgFillPct);      // hvor langt under grænse i pct-point
+                var lowFill = Math.Max(0, _thresholdPct - c.AvgFillPct);      // pct-point under grænse
                 var underShare = c.InefficientPct;                            // % under
                 var fewDataPenalty = c.TotalEmpties < 8 ? 20 : 0;             // små datamængder = mindre sikker
                 return lowFill * 2.0 + underShare * 0.8 - fewDataPenalty;
@@ -375,9 +410,8 @@
             // bucket for sort mode
             int Bucket(ContainerEfficiencyCustomerSummaryDto c)
             {
-                // zoner baseret på avg fill (hurtigt forståeligt)
                 if (c.AvgFillPct < 60) return 0;              // kritisk
-                if (c.AvgFillPct < _thresholdPct) return 1;   // gråzone/under grænse
+                if (c.AvgFillPct < _thresholdPct) return 1;   // gråzone
                 return 2;                                      // OK
             }
 
@@ -386,7 +420,7 @@
             {
                 "OK først" => q.OrderByDescending(Bucket).ThenBy(Score),
                 "Gråzone først" => q.OrderBy(c => Bucket(c) == 1 ? 0 : Bucket(c)).ThenByDescending(Score),
-                _ => q.OrderBy(Bucket).ThenByDescending(Score) // Kritisk først
+                _ => q.OrderBy(Bucket).ThenByDescending(Score)
             };
 
             return sorted.Take(100);
@@ -443,7 +477,6 @@
                     var underPct = count == 0 ? 0 : (underCount * 100.0 / count);
                     var avgFill = g.Average(x => x.FillPct);
 
-                    // Signal: rød hvis >80% under, gul hvis 40-80%, grøn ellers
                     string badgeClass;
                     string badgeLabel;
 
@@ -479,21 +512,25 @@
         string BadgeLabel
     );
 
-    // zoner (bruges til badges/progress)
-    private static string ZoneLabel(float avgFillPct) =>
+    // zoner (bruges til badges i kundelisten)
+    private static string ZoneLabel(float avgFillPct, int thresholdPct) =>
         avgFillPct < 60 ? "Kritisk" :
-        avgFillPct < 80 ? "Gråzone" :
+        avgFillPct < thresholdPct ? "Gråzone" :
         "OK";
 
-    private static string ZoneBadgeClass(float avgFillPct) =>
+    private static string ZoneBadgeClass(float avgFillPct, int thresholdPct) =>
         avgFillPct < 60 ? "bg-danger" :
-        avgFillPct < 80 ? "bg-warning text-dark" :
+        avgFillPct < thresholdPct ? "bg-warning text-dark" :
         "bg-success";
 
-    private static string FillClass(float fillPct, int thresholdPct) =>
-        fillPct < 60 ? "bg-danger" :
-        fillPct < thresholdPct ? "bg-warning" :
-        "bg-success";
+    // progress farver i rå-liste (inkl. outliers)
+    private static string FillClass(double rawFillPct, int thresholdPct)
+    {
+        if (IsOutlierFill(rawFillPct)) return "bg-warning";
+        if (rawFillPct < 60) return "bg-danger";
+        if (rawFillPct < thresholdPct) return "bg-warning";
+        return "bg-success";
+    }
 
     // ---------------------------
     // Data loading (uændret)
