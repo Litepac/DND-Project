@@ -9,23 +9,13 @@ namespace DNDProject.Api.ML;
 public sealed class MLTrainerService
 {
     private readonly MLDataService _data;
+    private readonly MLModelStore _store;
 
-    public MLTrainerService(MLDataService data)
+    public MLTrainerService(MLDataService data, MLModelStore store)
     {
         _data = data;
+        _store = store;
     }
-
-    // -----------------------------
-    // In-memory cache (static = deles på tværs af service instances)
-    // -----------------------------
-    private static readonly object _cacheLock = new();
-
-    private static ITransformer? _cachedModel;
-    private static Dictionary<string, double>? _cachedResidualStdBySk;
-    private static DateTime _cachedTrainedAtUtc;
-    private static DateTime _cachedFrom;
-    private static DateTime _cachedTo;
-    private static string _cachedDesc = "";
 
     // A) Train metrics (samme struktur som swagger)
     public sealed record TrainResult(
@@ -71,19 +61,28 @@ public sealed class MLTrainerService
 
         int n = rows.Count;
         int trainCount = (int)(n * 0.60);
-        int valCount   = (int)(n * 0.20);
-        int testCount  = n - trainCount - valCount;
+        int valCount = (int)(n * 0.20);
+        int testCount = n - trainCount - valCount;
+
+        // safety guard
+        trainCount = Math.Max(1, trainCount);
+        valCount = Math.Max(1, valCount);
+        testCount = Math.Max(1, testCount);
+
+        // justér hvis rounding giver problemer
+        if (trainCount + valCount + testCount != n)
+            testCount = n - trainCount - valCount;
 
         var trainRows = rows.Take(trainCount).ToList();
-        var valRows   = rows.Skip(trainCount).Take(valCount).ToList();
-        var testRows  = rows.Skip(trainCount + valCount).Take(testCount).ToList();
+        var valRows = rows.Skip(trainCount).Take(valCount).ToList();
+        var testRows = rows.Skip(trainCount + valCount).Take(testCount).ToList();
 
         // 5) ML
         var ml = new MLContext(seed: 42);
 
         var trainView = ml.Data.LoadFromEnumerable(trainRows.Select(MLCore.ToModelInput));
-        var valView   = ml.Data.LoadFromEnumerable(valRows.Select(MLCore.ToModelInput));
-        var testView  = ml.Data.LoadFromEnumerable(testRows.Select(MLCore.ToModelInput));
+        var valView = ml.Data.LoadFromEnumerable(valRows.Select(MLCore.ToModelInput));
+        var testView = ml.Data.LoadFromEnumerable(testRows.Select(MLCore.ToModelInput));
 
         var basePipe =
             ml.Transforms.Categorical.OneHotEncoding("SkabelonnrOneHot", nameof(MLCore.ModelInput.Skabelonnr))
@@ -153,19 +152,11 @@ public sealed class MLTrainerService
         var testPred = finalModel.Transform(testView);
         var testMetrics = ml.Regression.Evaluate(testPred, labelColumnName: "Label", scoreColumnName: "Score");
 
-        // 8) Compute residual std på samme data som final modellen er trænet på (train+val)
+        // 8) Compute residual std på train+val (samme data final modellen ser)
         var residualStdBySk = MLCore.ComputeResidualStdBySkabelonnr(ml, finalModel, trainPlusValRows);
 
-        // 9) CACHE i memory (thread-safe)
-        lock (_cacheLock)
-        {
-            _cachedModel = finalModel;
-            _cachedResidualStdBySk = residualStdBySk;
-            _cachedTrainedAtUtc = DateTime.UtcNow;
-            _cachedFrom = from.Date;
-            _cachedTo = to.Date;
-            _cachedDesc = $"CACHED | {bestDesc} | trainedAtUtc={_cachedTrainedAtUtc:O} | range={_cachedFrom:yyyy-MM-dd}..{_cachedTo:yyyy-MM-dd}";
-        }
+        // 9) Gem i memory store
+        _store.Set(finalModel, residualStdBySk, from, to);
 
         return new TrainResult(
             Rows: rows.Count,
@@ -173,12 +164,12 @@ public sealed class MLTrainerService
             Mae: testMetrics.MeanAbsoluteError,
             Rmse: testMetrics.RootMeanSquaredError,
             Rsquared: testMetrics.RSquared,
-            Message: $"OK | split=60/20/20 | BEST={bestDesc} | VAL: MAE={bestValMae:0.###}, RMSE={bestValRmse:0.###}, R²={bestValR2:0.###} | {_cachedDesc}"
+            Message: $"OK | split=60/20/20 | BEST={bestDesc} | VAL: MAE={bestValMae:0.###}, RMSE={bestValRmse:0.###}, R²={bestValR2:0.###} | cached"
         );
     }
 
     // -----------------------------
-    // B) Recommendations (bruger cached model hvis muligt)
+    // B) Recommendations (bruger cached model)
     // -----------------------------
     public sealed record RecommendRow(
         string CustomerNo,
@@ -192,31 +183,16 @@ public sealed class MLTrainerService
 
     public async Task<List<RecommendRow>> RecommendAsync(DateTime from, DateTime to, int take = 500)
     {
-        // 0) Sørg for at vi har en cached model
-        ITransformer? model;
-        Dictionary<string, double>? residualStdBySk;
-        lock (_cacheLock)
-        {
-            model = _cachedModel;
-            residualStdBySk = _cachedResidualStdBySk;
-        }
-
-        // Hvis ingen model endnu: træn én gang og cache
-        if (model is null || residualStdBySk is null)
+        // 0) Sikr model
+        if (!_store.TryGet(out var model, out var residualStdBySk, out _, out _, out _))
         {
             await TrainAsync(from, to);
 
-            lock (_cacheLock)
-            {
-                model = _cachedModel;
-                residualStdBySk = _cachedResidualStdBySk;
-            }
-
-            if (model is null || residualStdBySk is null)
-                return new(); // burde ikke ske, men safe fallback
+            if (!_store.TryGet(out model, out residualStdBySk, out _, out _, out _))
+                return new();
         }
 
-        // 1) Hent daily fra DB (du bruger stadig den aktuelle periode som input til features)
+        // 1) Hent daily fra DB
         var dailyDb = await _data.LoadDailyPickupsAsync(from, to);
 
         var daily = dailyDb.Select(x => new MLCore.PickupDaily(
@@ -225,7 +201,7 @@ public sealed class MLTrainerService
 
         if (daily.Count < 50) return new();
 
-        // 2) Feature engineering til prediction inputs
+        // 2) Features
         var rows = MLCore.BuildTrainingRowsWithRolling(daily);
         if (rows.Count < 300) return new();
 
@@ -298,21 +274,82 @@ public sealed class MLTrainerService
 
     public async Task<RecommendationDto?> RecommendOneAsync(DateTime from, DateTime to, string customerNo)
     {
-        var all = await RecommendAsync(from, to, take: 5000);
+        if (string.IsNullOrWhiteSpace(customerNo)) return null;
+        customerNo = customerNo.Trim();
 
-        var hit = all.FirstOrDefault(x =>
-            string.Equals(x.CustomerNo, customerNo, StringComparison.OrdinalIgnoreCase));
+        // 0) Sikr model
+        if (!_store.TryGet(out var model, out var residualStdBySk, out _, out _, out _))
+        {
+            await TrainAsync(from, to);
 
-        if (hit is null) return null;
+            if (!_store.TryGet(out model, out residualStdBySk, out _, out _, out _))
+                return null;
+        }
+
+        // 1) Hent data kun for kunden hvis muligt (numeric)
+        List<MLDataService.PickupDailyDb> dailyDb;
+
+        if (int.TryParse(customerNo, out var custKey))
+            dailyDb = await _data.LoadDailyPickupsForCustomerAsync(from, to, custKey);
+        else
+            dailyDb = await _data.LoadDailyPickupsAsync(from, to);
+
+        var daily = dailyDb.Select(x => new MLCore.PickupDaily(
+            Skabelonnr: x.Skabelonnr,
+            Date: x.Date,
+            CollectedKg: x.CollectedKg,
+            CustomerNo: x.CustomerNo,
+            CustomerName: x.CustomerName
+        )).ToList();
+
+        if (daily.Count < 10) return null;
+
+        // 2) Features
+        var rows = MLCore.BuildTrainingRowsWithRolling(daily);
+        if (rows.Count < 10) return null;
+
+        rows = MLCore.ClipLabelOutliers(rows, p: 0.99);
+
+        // 3) Find seneste row pr skabelon for kunden
+        var latestRows = rows
+            .Where(r => string.Equals(r.CustomerNo, customerNo, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(r => r.Skabelonnr)
+            .Select(g => g.OrderByDescending(x => x.Date).First())
+            .ToList();
+
+        if (latestRows.Count == 0) return null;
+
+        var custName = latestRows.Select(x => x.CustomerName)
+            .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? "";
+
+        var ml = new MLContext(seed: 42);
+
+        // 4) Predict + safety sum
+        var inputs = latestRows.Select(MLCore.ToModelInputNoLabel).ToList();
+        var dv = ml.Data.LoadFromEnumerable(inputs);
+
+        var pred = model.Transform(dv);
+        var preds = ml.Data.CreateEnumerable<MLCore.ModelOutput>(pred, reuseRowObject: false).ToList();
+
+        double totalKgPerDaySafe = 0;
+
+        for (int i = 0; i < preds.Count; i++)
+        {
+            var sk = latestRows[i].Skabelonnr.Trim();
+            var residStd = residualStdBySk.TryGetValue(sk, out var s) ? s : residualStdBySk["__GLOBAL__"];
+            totalKgPerDaySafe += preds[i].Score + (MLCore.SafetyK * residStd);
+        }
+
+        var (capL, n, freq, fill, _) = MLCore.ChooseBestComboCostBased(totalKgPerDaySafe);
 
         return new RecommendationDto(
-            hit.CustomerNo,
-            hit.CustomerName,
-            hit.ContainerL,
-            hit.ContainerCount,
-            hit.FrequencyDays,
-            hit.ExpectedFill,
-            hit.PredKgPerDaySafe
+            CustomerNo: customerNo,
+            CustomerName: custName,
+            ContainerL: capL,
+            ContainerCount: n,
+            FrequencyDays: freq,
+            ExpectedFill: fill,
+            PredKgPerDaySafe: totalKgPerDaySafe
         );
     }
 

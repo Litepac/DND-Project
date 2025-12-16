@@ -35,6 +35,8 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<DNDProject.Api.ML.MLDataService>();
 builder.Services.AddScoped<DNDProject.Api.ML.MLTrainerService>();
 
+// Cache af trænet model i memory (hurtigere recommend)
+builder.Services.AddSingleton<DNDProject.Api.ML.MLModelStore>();
 
 
 
