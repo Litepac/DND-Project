@@ -228,6 +228,7 @@ else if (rec is not null)
 </div>
 
 
+
     </div>
 }
 else
@@ -342,10 +343,11 @@ else
         }
     }
 
-    async Task PrintPdf()
+   async Task PrintPdf()
 {
-    await JS.InvokeVoidAsync("printPage");
+    await JS.InvokeVoidAsync("window.print");
 }
+
 
     void Back() => Nav.NavigateTo("/ml-customers");
 

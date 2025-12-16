@@ -1,1 +1,0 @@
-window.printPage = () => window.print();
