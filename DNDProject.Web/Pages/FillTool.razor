@@ -1,0 +1,98 @@
+@page "/fill-tool"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h3>Manuel container fill</h3>
+
+<div class="card p-3" style="max-width:520px;">
+    <div class="mb-2">
+        <label>Kg pr. dag</label>
+        <input class="form-control" type="number" step="0.01" @bind="KgPerDay" />
+    </div>
+
+    <div class="mb-2">
+        <label>Densitet (kg/L)</label>
+        <input class="form-control" type="number" step="0.01" @bind="DensityKgPerLiter" />
+    </div>
+
+    <div class="mb-2">
+        <label>Afhentningsfrekvens (dage)</label>
+        <input class="form-control" type="number" step="1" @bind="FrequencyDays" />
+    </div>
+
+    <div class="mb-2">
+        <label>Container størrelse (L)</label>
+        <input class="form-control" type="number" step="1" @bind="ContainerSizeLiters" />
+    </div>
+
+    <div class="mb-2">
+        <label>Antal containere</label>
+        <input class="form-control" type="number" step="1" @bind="ContainerCount" />
+    </div>
+
+    <button class="btn btn-primary mt-2" @onclick="Calculate">Beregn</button>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="alert alert-danger mt-3">@Error</div>
+    }
+    else if (HasResult)
+    {
+        <div class="alert alert-info mt-3">
+            <div><b>Expected fill:</b> @ExpectedFill.ToString("0.###")</div>
+            <div><b>Expected fill %:</b> @ExpectedFillPercent.ToString("0.##") %</div>
+        </div>
+    }
+</div>
+
+@code {
+    double KgPerDay { get; set; } = 25;
+    double DensityKgPerLiter { get; set; } = 0.13;
+    int FrequencyDays { get; set; } = 7;
+    int ContainerSizeLiters { get; set; } = 660;
+    int ContainerCount { get; set; } = 1;
+
+    bool HasResult { get; set; }
+    double ExpectedFill { get; set; }
+    double ExpectedFillPercent { get; set; }
+    string Error { get; set; } = "";
+
+    async Task Calculate()
+    {
+        Error = "";
+        HasResult = false;
+
+        var req = new
+        {
+            KgPerDay,
+            DensityKgPerLiter,
+            FrequencyDays,
+            ContainerSizeLiters,
+            ContainerCount
+        };
+
+        var res = await Http.PostAsJsonAsync("api/fill/calc", req);
+        if (!res.IsSuccessStatusCode)
+        {
+            Error = $"API fejl: {(int)res.StatusCode} {res.ReasonPhrase}";
+            return;
+        }
+
+        var body = await res.Content.ReadFromJsonAsync<FillResponse>();
+        if (body is null)
+        {
+            Error = "Kunne ikke læse response.";
+            return;
+        }
+
+        ExpectedFill = body.ExpectedFill;
+        ExpectedFillPercent = body.ExpectedFillPercent;
+        HasResult = true;
+    }
+
+    sealed class FillResponse
+    {
+        public double ExpectedFill { get; set; }
+        public double ExpectedFillPercent { get; set; }
+    }
+}
