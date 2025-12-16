@@ -1,6 +1,7 @@
 @page "/customer-dashboard"
 
 @using System.Net.Http.Json
+@using System.Globalization
 @using System.Linq
 @using DNDProject.Web.Models   @* DTO'er: CustomerSummaryDto, CustomerDashboardDto, CustomerTimeseriesPointDto *@
 @inject HttpClient Http
@@ -12,6 +13,11 @@
     <div class="alert alert-danger">@_error</div>
 }
 
+@if (!string.IsNullOrEmpty(_warning))
+{
+    <div class="alert alert-warning">@_warning</div>
+}
+
 @if (_isLoading && (_customers is null || _customers.Count == 0))
 {
     <p>Loading...</p>
@@ -21,8 +27,23 @@ else
     <div class="row">
         <!-- Venstre kolonne: liste over kunder -->
         <div class="col-md-4 border-end">
-            <h5>Alle kunder</h5>
-            <p class="text-muted mb-2">Klik på en kunde for at se detaljer.</p>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h5 class="mb-1">Alle kunder</h5>
+                    <p class="text-muted mb-2">Klik på en kunde for at se detaljer.</p>
+                </div>
+
+                <div style="min-width: 160px;">
+                    <label class="form-label mb-0">Periode (måneder)</label>
+                    <select class="form-select form-select-sm"
+                            @onchange="OnMonthsChanged">
+                        <option value="3" selected="@(_months == 3)">3</option>
+                        <option value="6" selected="@(_months == 6)">6</option>
+                        <option value="12" selected="@(_months == 12)">12</option>
+                        <option value="24" selected="@(_months == 24)">24</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="mb-2">
                 <input class="form-control"
@@ -51,14 +72,14 @@ else
                         @foreach (var c in FilteredCustomers)
                         {
                             var isSelected = _selectedCustomer?.CustomerKey == c.CustomerKey;
-                            var rowClass   = isSelected ? "table-primary" : "";
+                            var rowClass = isSelected ? "table-primary" : "";
 
                             <tr class="@rowClass"
                                 style="cursor: pointer;"
                                 @onclick="@(() => OnCustomerClicked(c))">
-                                <td>@c.CustomerKey</td>
+                                <td class="fw-semibold">@c.CustomerKey</td>
                                 <td>@c.CustomerName</td>
-                                <td class="text-end">@c.TotalWeightKg.ToString("N3")</td>
+                                <td class="text-end">@FormatKg(c.TotalWeightKg)</td>
                                 <td class="text-end">@c.ReceiptCount</td>
                             </tr>
                         }
@@ -72,6 +93,10 @@ else
                     }
                 </tbody>
             </table>
+
+            <div class="text-muted small mt-2">
+                Tip: hvis venstre “Total kg” ikke matcher højre periode, så mangler summary-API’et sandsynligvis at filtrere på months.
+            </div>
         </div>
 
         <!-- Højre kolonne: detaljer for valgt kunde -->
@@ -95,9 +120,21 @@ else
             {
                 var s = _details.Summary;
 
+                // --- KPI beregninger ---
+                var avgKgPerReceipt = (s.ReceiptCount > 0) ? (s.TotalWeightKg / s.ReceiptCount) : 0;
+
+                var series = NormalizedTimeseries; // altid _months måneder (med 0'er)
+                var latestMonth = series.FirstOrDefault(); // første er nyeste (vi sorterer desc)
+                var latestMonthKg = latestMonth?.TotalWeightKg ?? 0;
+
+                var trendPct = ComputeTrendPct(series); // seneste 3 mdr vs forrige 3 mdr
+                var trendLabel = trendPct is null
+                    ? "—"
+                    : $"{trendPct.Value.ToString("N0", CultureInfo.GetCultureInfo("da-DK"))}%";
+
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
-                        <h5>
+                        <h5 class="mb-1">
                             Detaljer for: @s.CustomerKey
                             @if (!string.IsNullOrWhiteSpace(s.CustomerName))
                             {
@@ -105,57 +142,80 @@ else
                             }
                         </h5>
 
-                        <div> Total vægt: <strong>@s.TotalWeightKg.ToString("N3") kg</strong></div>
-                        <div> Antal modtagelser: <strong>@s.ReceiptCount</strong></div>
-                        <div> Periode: <strong>@s.FirstDate.ToString("yyyy-MM-dd")</strong>
+                        <div class="text-muted small">
+                            Periode (data): <strong>@s.FirstDate.ToString("yyyy-MM-dd")</strong>
                             –
                             <strong>@s.LastDate.ToString("yyyy-MM-dd")</strong>
                         </div>
+
+                        <div class="mt-2 d-flex gap-2 flex-wrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="/container-efficiency">
+                                Åbn tømningsanalyse
+                            </a>
+                            <a class="btn btn-sm btn-outline-secondary" href="/ml-customers">
+                                Åbn ML anbefaling
+                            </a>
+                        </div>
                     </div>
 
-                    <div>
-                        <label for="monthsSelect" class="form-label mb-0">Periode (måneder)</label>
-                        <select id="monthsSelect"
-                                class="form-select form-select-sm"
-                                style="width: 120px;"
-                                @onchange="OnMonthsChanged">
-                            <option value="3"  selected="@(_months == 3)">3</option>
-                            <option value="6"  selected="@(_months == 6)">6</option>
-                            <option value="12" selected="@(_months == 12)">12</option>
-                            <option value="24" selected="@(_months == 24)">24</option>
-                        </select>
+                    <div class="text-muted small text-end">
+                        Viser altid @(_months) måneder (mangler = 0)
                     </div>
                 </div>
 
-                <hr />
+                <!-- KPI cards -->
+                <div class="row g-2 mt-2">
+                    <div class="col-md-4">
+                        <div class="border rounded p-2">
+                            <div class="text-muted small">Total vægt</div>
+                            <div class="fw-semibold">@FormatKg(s.TotalWeightKg)</div>
+                            <div class="text-muted small">Modtagelser: @s.ReceiptCount</div>
+                        </div>
+                    </div>
 
-                <h6>Udvikling (kg pr. måned)</h6>
+                    <div class="col-md-4">
+                        <div class="border rounded p-2">
+                            <div class="text-muted small">Gns. kg pr. modtagelse</div>
+                            <div class="fw-semibold">@FormatKg(avgKgPerReceipt)</div>
+                            <div class="text-muted small">(@s.TotalWeightKg.ToString("N0", CultureInfo.GetCultureInfo("da-DK")) / @s.ReceiptCount)</div>
+                        </div>
+                    </div>
 
-                @if (_details.Timeseries is null || !_details.Timeseries.Any())
+                    <div class="col-md-4">
+                        <div class="border rounded p-2">
+                            <div class="text-muted small">Trend (3 mdr)</div>
+                            <div class="fw-semibold">@trendLabel</div>
+                            <div class="text-muted small">Seneste 3 vs forrige 3</div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-3" />
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Udvikling (kg pr. måned)</h6>
+                    <div class="text-muted small">Seneste måned: <b>@FormatKg(latestMonthKg)</b></div>
+                </div>
+
+                @if (series is null || !series.Any())
                 {
                     <p class="text-muted">Ingen vægt-data i den valgte periode.</p>
                 }
                 else
                 {
-                    // Find den største måneds-vægt til skalering af progress bars
-                    float maxKg = _details.Timeseries.Any()
-                        ? _details.Timeseries.Max(p => p.TotalWeightKg)
-                        : 1f;
+                    // Find max til skalering af progress bars
+                    float maxKg = series.Max(p => p.TotalWeightKg);
+                    if (maxKg <= 0) maxKg = 1;
 
-                    if (maxKg <= 0)
-                    {
-                        maxKg = 1;
-                    }
-
-                    <div class="mb-2">
-                        @foreach (var p in _details.Timeseries)
+                    <div class="mb-2 mt-2">
+                        @foreach (var p in series)
                         {
                             float widthPct = (p.TotalWeightKg / maxKg) * 100f;
 
                             <div class="mb-1">
                                 <div class="d-flex justify-content-between">
                                     <span>@p.Label</span>
-                                    <span>@p.TotalWeightKg.ToString("N3") kg</span>
+                                    <span>@FormatKg(p.TotalWeightKg)</span>
                                 </div>
 
                                 <div class="progress" style="height: 12px;">
@@ -171,8 +231,8 @@ else
                     </div>
                 }
             }
-        </div> <!-- col-md-8 -->
-    </div>     <!-- row -->
+        </div>
+    </div>
 }
 
 @code {
@@ -182,6 +242,7 @@ else
 
     private bool _isLoading = true;
     private string? _error;
+    private string? _warning;
 
     private int _months = 6;
     private string _searchText = string.Empty;
@@ -194,7 +255,8 @@ else
                 .Where(c =>
                     (!string.IsNullOrWhiteSpace(c.CustomerName) &&
                      c.CustomerName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
-                    || c.CustomerKey.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+                    || (!string.IsNullOrWhiteSpace(c.CustomerKey) &&
+                        c.CustomerKey.Contains(_searchText, StringComparison.OrdinalIgnoreCase)));
 
     protected override async Task OnInitializedAsync()
     {
@@ -204,16 +266,40 @@ else
     private async Task LoadSummaries()
     {
         _error = null;
+        _warning = null;
         _isLoading = true;
 
         try
         {
-            _customers = await Http
-                .GetFromJsonAsync<List<CustomerSummaryDto>>("api/stena/customers/summary");
+            // 1) Først prøver vi at hente summary filtreret på months (bedst)
+            //    Hvis endpoint ikke findes, fallback til gammel uden months.
+            List<CustomerSummaryDto>? list = null;
+
+            try
+            {
+                list = await Http.GetFromJsonAsync<List<CustomerSummaryDto>>(
+                    $"api/stena/customers/summary?months={_months}");
+            }
+            catch
+            {
+                // fallback
+                list = await Http.GetFromJsonAsync<List<CustomerSummaryDto>>(
+                    "api/stena/customers/summary");
+
+                _warning = "Summary-listen ser ud til ikke at være filtreret på periode endnu (months). " +
+                           "Højre side viser korrekt periode – venstre kan vise “all-time”, indtil API’et opdateres.";
+            }
+
+            _customers = list;
 
             if (_customers is not null && _customers.Count > 0)
             {
-                _selectedCustomer = _customers[0];
+                // bevar valgt kunde hvis muligt
+                var keepKey = _selectedCustomer?.CustomerKey;
+                _selectedCustomer = keepKey is not null
+                    ? _customers.FirstOrDefault(x => x.CustomerKey == keepKey) ?? _customers[0]
+                    : _customers[0];
+
                 await LoadDetails(_selectedCustomer.CustomerKey);
             }
         }
@@ -263,7 +349,101 @@ else
 
         _months = m;
 
-        if (_selectedCustomer is not null)
-            await LoadDetails(_selectedCustomer.CustomerKey);
+        // vigtig: months styrer både venstre og højre
+        await LoadSummaries();
     }
+
+    // -----------------------------
+    // Timeseries normalisering
+    // -----------------------------
+    private List<CustomerTimeseriesPointDto> NormalizedTimeseries
+    {
+        get
+        {
+            var ts = _details?.Timeseries ?? new List<CustomerTimeseriesPointDto>();
+            var s = _details?.Summary;
+
+            if (s is null)
+                return new List<CustomerTimeseriesPointDto>();
+
+            // Vi vil altid vise _months måneder, sluttende i summary.LastDate’s måned
+            var end = new DateTime(s.LastDate.Year, s.LastDate.Month, 1);
+            var months = Enumerable.Range(0, _months)
+                .Select(i => end.AddMonths(-i))
+                .ToList();
+
+            // map eksisterende data på label (yyyy-MM eller hvad I bruger)
+            // Vi matcher på "yyyy-MM" for robusthed.
+            var map = ts
+                .GroupBy(p => NormalizeMonthKey(p.Label))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var result = new List<CustomerTimeseriesPointDto>();
+
+            foreach (var dt in months)
+            {
+                var key = dt.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+                if (map.TryGetValue(key, out var existing))
+                {
+                    // sørg for label er pæn konsistent
+                    result.Add(new CustomerTimeseriesPointDto
+                    {
+                        Label = key,
+                        TotalWeightKg = existing.TotalWeightKg
+                    });
+                }
+                else
+                {
+                    result.Add(new CustomerTimeseriesPointDto
+                    {
+                        Label = key,
+                        TotalWeightKg = 0
+                    });
+                }
+            }
+
+            return result;
+        }
+    }
+
+    private static string NormalizeMonthKey(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label)) return "";
+
+        label = label.Trim();
+
+        // Hvis label allerede er yyyy-MM, brug den
+        if (label.Length >= 7 && label[4] == '-')
+            return label.Substring(0, 7);
+
+        // ellers prøv parse (fallback)
+        if (DateTime.TryParse(label, out var dt))
+            return dt.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+
+        return label;
+    }
+
+    private static double? ComputeTrendPct(List<CustomerTimeseriesPointDto> seriesNewestFirst)
+    {
+        if (seriesNewestFirst is null || seriesNewestFirst.Count < 6)
+            return null;
+
+        var last3 = seriesNewestFirst.Take(3).Sum(x => x.TotalWeightKg);
+        var prev3 = seriesNewestFirst.Skip(3).Take(3).Sum(x => x.TotalWeightKg);
+
+        if (prev3 <= 0)
+        {
+            // hvis der var 0 før, kan vi ikke give meningsfuld procent
+            return last3 > 0 ? 100 : 0;
+        }
+
+        return ((last3 - prev3) / prev3) * 100.0;
+    }
+
+    private static string FormatKg(double kg)
+        => kg.ToString("N1", CultureInfo.GetCultureInfo("da-DK")) + " kg";
+
+    private static string FormatKg(float kg)
+        => kg.ToString("N1", CultureInfo.GetCultureInfo("da-DK")) + " kg";
 }
