@@ -425,54 +425,42 @@
     // ---------------------------
     // V2: KUNDER LISTE (smart sort)
     // ---------------------------
-    private IEnumerable<ContainerEfficiencyCustomerSummaryDto> FilteredCustomersV2
+   private IEnumerable<ContainerEfficiencyCustomerSummaryDto> FilteredCustomersV2
+{
+    get
     {
-        get
+        var src = _customers ?? Enumerable.Empty<ContainerEfficiencyCustomerSummaryDto>();
+
+        // 1) Søgning (hvis der søges, filtrér først)
+        if (!string.IsNullOrWhiteSpace(_searchText))
         {
-            var src = _customers ?? Enumerable.Empty<ContainerEfficiencyCustomerSummaryDto>();
-
-            // søgning: vis alle matches
-            if (!string.IsNullOrWhiteSpace(_searchText))
-            {
-                return src.Where(c =>
-                    (c.CustomerName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-                    || c.CustomerKey.ToString().Contains(_searchText));
-            }
-
-            // uden søgning: brug diagnose-sortering
-            var q = src;
-
-            if (!_showOkCustomers)
-            {
-                // skjul de helt “OK” for at få bedre overblik
-                q = q.Where(c => c.AvgFillPct < _thresholdPct);
-            }
-
-            double Score(ContainerEfficiencyCustomerSummaryDto c)
-            {
-                var lowFill = Math.Max(0, _thresholdPct - c.AvgFillPct);
-                var underShare = c.InefficientPct;
-                var fewDataPenalty = c.TotalEmpties < 8 ? 20 : 0;
-                return lowFill * 2.0 + underShare * 0.8 - fewDataPenalty;
-            }
-
-            int Bucket(ContainerEfficiencyCustomerSummaryDto c)
-            {
-                if (c.AvgFillPct < 60) return 0;
-                if (c.AvgFillPct < _thresholdPct) return 1;
-                return 2;
-            }
-
-            IEnumerable<ContainerEfficiencyCustomerSummaryDto> sorted = _sortMode switch
-            {
-                "OK først" => q.OrderByDescending(Bucket).ThenBy(Score),
-                "Gråzone først" => q.OrderBy(c => Bucket(c) == 1 ? 0 : Bucket(c)).ThenByDescending(Score),
-                _ => q.OrderBy(Bucket).ThenByDescending(Score)
-            };
-
-            return sorted.Take(100);
+            src = src.Where(c =>
+                (c.CustomerName ?? "").Contains(_searchText, StringComparison.OrdinalIgnoreCase)
+                || c.CustomerKey.ToString().Contains(_searchText));
         }
+
+        // 2) Zone-filter (Kritisk/Gråzone/OK/Alle)
+        src = _zone switch
+        {
+            "Kritisk" => src.Where(c => c.AvgFillPct < 60),
+            "Gråzone" => src.Where(c => c.AvgFillPct >= 60 && c.AvgFillPct < _thresholdPct),
+            "OK"      => src.Where(c => c.AvgFillPct >= _thresholdPct),
+            _         => src // Alle
+        };
+
+        // 3) Sortér så det giver mening inden for det valgte filter
+        // (lavest fyldning først, og derefter høj ineffektivitet)
+        src = src
+            .OrderBy(c => c.AvgFillPct)
+            .ThenByDescending(c => c.InefficientPct);
+
+        // Hvis du vil begrænse uden søgning:
+        if (string.IsNullOrWhiteSpace(_searchText))
+            src = src.Take(100);
+
+        return src;
     }
+}
 
     private void ToggleShowAllEmpties() => _showAllEmpties = !_showAllEmpties;
 
@@ -538,16 +526,6 @@
         string BadgeLabel
     );
 
-    // zoner (badges i kundelisten) - baseret på threshold (ikke hard-coded 80)
-    private static string ZoneLabel(float avgFillPct, int thresholdPct) =>
-        avgFillPct < 60 ? "Kritisk" :
-        avgFillPct < thresholdPct ? "Gråzone" :
-        "OK";
-
-    private static string ZoneBadgeClass(float avgFillPct, int thresholdPct) =>
-        avgFillPct < 60 ? "bg-danger" :
-        avgFillPct < thresholdPct ? "bg-warning text-dark" :
-        "bg-success";
 
     // progress farver i rå-liste (inkl. outliers)
     private static string FillClass(double rawFillPct, int thresholdPct)
@@ -653,5 +631,16 @@ private void SetZone(string z) => _zone = z;
 
 private string ZoneBtnClass(string z)
     => "btn btn-sm " + (_zone == z ? "btn-primary" : "btn-outline-secondary");
+
+private static string ZoneLabel(float avgFillPct, int thresholdPct) =>
+    avgFillPct < 60 ? "Kritisk" :
+    avgFillPct < thresholdPct ? "Gråzone" :
+    "OK";
+
+private static string ZoneBadgeClass(float avgFillPct, int thresholdPct) =>
+    avgFillPct < 60 ? "bg-danger" :
+    avgFillPct < thresholdPct ? "bg-warning text-dark" :
+    "bg-success";
+
 
 }
