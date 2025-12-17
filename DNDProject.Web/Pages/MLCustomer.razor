@@ -33,9 +33,19 @@ else if (rec is not null)
     var proposedCo2 = proposedTrips * kmPerTrip * co2PerKm;
     var co2SavedRaw = currentCo2 - proposedCo2;
 
-    var currentCost = currentTrips * costPerTrip;
-    var proposedCost = proposedTrips * costPerTrip;
-    var costSavedRaw = currentCost - proposedCost;
+ var currentTripCost = currentTrips * costPerTrip;
+var proposedTripCost = proposedTrips * costPerTrip;
+
+var currentRentYear = RentCostPerYear(Current);
+var proposedRentYear = RentCostPerYear(Proposed);
+
+var currentTotalCost = currentTripCost + currentRentYear;
+var proposedTotalCost = proposedTripCost + proposedRentYear;
+
+var costSavedRaw = currentTotalCost - proposedTotalCost;
+var costLabel = costSavedRaw >= 0 ? "Potentiale kr/år" : "Meromkostning kr/år";
+
+var costSaved = currentTotalCost - proposedTotalCost;
 
     var outOfScope = (Proposed.ContainerL == 1100 && Proposed.ContainerCount >= 15);
 
@@ -529,4 +539,19 @@ else
 
         return totalCapacityLiters <= 0 ? 0 : (litersPerEmptyTotal / totalCapacityLiters);
     }
+
+static readonly Dictionary<int, double> RentPerMonthByLiters = new()
+{
+    [120] = 21.34857482,
+    [240] = 80.0,
+    [660] = 96.0,
+    [1100] = 115.0
+};
+
+static double RentPerMonth(int liters)
+    => RentPerMonthByLiters.TryGetValue(liters, out var v) ? Math.Abs(v) : 0.0;
+
+double RentCostPerYear(Setup s)
+    => NormCount(s.ContainerCount) * RentPerMonth(NormLiters(s.ContainerL)) * 12.0;
+
 }
