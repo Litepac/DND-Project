@@ -62,7 +62,6 @@ namespace DNDProject.Api.Data
                 entity.Property(x => x.Uge_dag).HasColumnName("Uge_dag");
                 entity.Property(x => x.Start_dato).HasColumnName("Start_dato");
 
-                // ✅ DETTE ER GRUNDEN TIL DIN FEJL: ø !
                 entity.Property(x => x.PurchaseOrderNumber).HasColumnName("Købsordrenr");
             });
 
