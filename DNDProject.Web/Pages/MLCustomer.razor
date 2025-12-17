@@ -22,218 +22,213 @@ else if (busy)
 }
 else if (rec is not null)
 {
-    <div style="max-width:920px;">
-        @{
-            var (outOfScope, outMsg) = IsOutOfScope(rec);
-        }
+    // live-beregninger pr. render (så dropdowns opdaterer med det samme)
+    var currentFill = ExpectedFill(rec.PredKgPerDaySafe, densityKgPerL, Current.FrequencyDays, Current.ContainerL, Current.ContainerCount);
+    var proposedFill = ExpectedFill(rec.PredKgPerDaySafe, densityKgPerL, Proposed.FrequencyDays, Proposed.ContainerL, Proposed.ContainerCount);
 
-        @if (outOfScope)
-        {
-            <div class="alert alert-warning">
-                <b>Uden for små-container modellen</b><br />
-                @outMsg<br />
-                <span class="text-muted">
-                    Brug i stedet en “stor-container/komprimator” model eller manuel vurdering.
-                </span>
-            </div>
-        }
+    var currentTrips = TripsPerYear(Current.FrequencyDays);
+    var proposedTrips = TripsPerYear(Proposed.FrequencyDays);
 
-        <!-- TOP: ML recommendation + manual calculator side by side -->
+    var tripsSaved = currentTrips - proposedTrips;
+
+    var currentCo2 = currentTrips * kmPerTrip * co2PerKm;
+    var proposedCo2 = proposedTrips * kmPerTrip * co2PerKm;
+    var co2Saved = currentCo2 - proposedCo2;
+
+    var currentCost = currentTrips * costPerTrip;
+    var proposedCost = proposedTrips * costPerTrip;
+    var costSaved = currentCost - proposedCost;
+
+    var outOfScope = (Proposed.ContainerL == 1100 && Proposed.ContainerCount >= 15);
+
+    <div style="max-width: 1100px;">
+
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-outline-secondary" @onclick="Back">← Tilbage</button>
+            <button class="btn btn-outline-primary" @onclick="PrintPdf">Print / PDF</button>
+            <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
+        </div>
+
+        <!-- TOP: NUVÆRENDE vs ANBEFALET -->
         <div class="row g-3 mb-3">
+            <!-- NUVÆRENDE -->
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
                     <div class="card-body">
-                        <h5 class="card-title mb-1">@rec.CustomerName</h5>
-                        <div class="text-muted mb-3">Kundenr: @rec.CustomerNo</div>
+                        <h5 class="card-title mb-1">Nuværende setup</h5>
+                        <div class="text-muted mb-3">@rec.CustomerName (Kundenr: @rec.CustomerNo)</div>
 
-                        <dl class="row mb-0">
-                            <dt class="col-sm-4">Container</dt>
-                            <dd class="col-sm-8">@rec.ContainerCount × @rec.ContainerL L</dd>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label">Container størrelse</label>
+                                <select class="form-select" @bind="Current.ContainerL">
+                                    @foreach (var s in AllowedSizes)
+                                    {
+                                        <option value="@s">@s L</option>
+                                    }
+                                </select>
+                            </div>
 
-                            <dt class="col-sm-4">Frekvens</dt>
-                            <dd class="col-sm-8">Hver @rec.FrequencyDays dage</dd>
+                            <div class="col-6">
+                                <label class="form-label">Antal containere</label>
+                                <select class="form-select" @bind="Current.ContainerCount">
+                                    @for (int i = 1; i <= 30; i++)
+                                    {
+                                        <option value="@i">@i</option>
+                                    }
+                                </select>
+                            </div>
 
-                            <dt class="col-sm-4">Expected fill</dt>
-                            <dd class="col-sm-8">@rec.ExpectedFill.ToString("P0")</dd>
-
-                            <dt class="col-sm-4">Pred kg/dag (safe)</dt>
-                            <dd class="col-sm-8">@rec.PredKgPerDaySafe.ToString("N0")</dd>
-                        </dl>
+                            <div class="col-12">
+                                <label class="form-label">Frekvens (dage)</label>
+                                <select class="form-select" @bind="Current.FrequencyDays">
+                                    @foreach (var d in AllowedFrequencies)
+                                    {
+                                        <option value="@d">Hver @d dage</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
 
                         <hr />
 
-                        <div class="small text-muted">
-                            <div><b>Container</b>: foreslået antal × nominelt volumen (L) for restaffald.</div>
-                            <div><b>Frekvens</b>: foreslået antal dage mellem tømninger.</div>
-                            <div><b>Expected fill</b>: estimeret fyldningsgrad ved tømning (volumen-baseret antagelse).</div>
-                            <div><b>Pred kg/dag (safe)</b>: konservativt estimat for gennemsnitlig kg pr. dag baseret på historik/model.</div>
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Est. fill ved tømning</dt>
+                            <dd class="col-sm-7">@currentFill.ToString("P0")</dd>
+
+                            <dt class="col-sm-5">Ture/år (est.)</dt>
+                            <dd class="col-sm-7">@currentTrips.ToString("N0")</dd>
+
+                            <dt class="col-sm-5">Pred kg/dag (safe)</dt>
+                            <dd class="col-sm-7">@rec.PredKgPerDaySafe.ToString("N0")</dd>
+                        </dl>
+
+                        <div class="text-muted small mt-2">
+                            “Nuværende setup” kan justeres hvis kontraktopsætningen afviger fra historik.
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANBEFALET -->
+            <div class="col-12 col-lg-6">
+                <div class="card h-100 border-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title mb-1">Anbefalet setup (ML)</h5>
+                                <div class="text-muted">Starter på ML – kan justeres</div>
+                            </div>
+
+                            <button class="btn btn-sm btn-outline-primary" @onclick="ResetProposedToMl">
+                                Reset til ML
+                            </button>
+                        </div>
+
+                        <div class="row g-2 mt-2">
+                            <div class="col-6">
+                                <label class="form-label">Container størrelse</label>
+                                <select class="form-select" @bind="Proposed.ContainerL">
+                                    @foreach (var s in AllowedSizes)
+                                    {
+                                        <option value="@s">@s L</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-6">
+                                <label class="form-label">Antal containere</label>
+                                <select class="form-select" @bind="Proposed.ContainerCount">
+                                    @for (int i = 1; i <= 30; i++)
+                                    {
+                                        <option value="@i">@i</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Frekvens (dage)</label>
+                                <select class="form-select" @bind="Proposed.FrequencyDays">
+                                    @foreach (var d in AllowedFrequencies)
+                                    {
+                                        <option value="@d">Hver @d dage</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr />
+
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Est. fill ved tømning</dt>
+                            <dd class="col-sm-7">@proposedFill.ToString("P0")</dd>
+
+                            <dt class="col-sm-5">Ture/år (est.)</dt>
+                            <dd class="col-sm-7">@proposedTrips.ToString("N0")</dd>
+
+                            <dt class="col-sm-5">ML default</dt>
+                            <dd class="col-sm-7">@rec.ContainerCount × @rec.ContainerL L • hver @rec.FrequencyDays dage</dd>
+                        </dl>
+
+                        @if (outOfScope)
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">
+                                Setup virker uden for “små beholdere”-scope (fx 15 × 1100L).
+                                Overvej en anden model/tilgang (komprimator/skip/storkunde-løsning).
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Business + ESG -->
+        <!-- RUBRIK: BESPARELSE -->
         <div class="card mb-3">
             <div class="card-body">
-                <h5 class="mb-1">Business & ESG impact (før / efter)</h5>
-                <div class="text-muted mb-3">
-                    Viser baseline (historisk) vs anbefalet. Tallene afhænger af antagelserne (kan justeres).
-                </div>
+                <h5 class="mb-1">Besparelse (nuværende → valgt setup)</h5>
+                <div class="text-muted mb-3">Estimat baseret på antagelserne nedenfor.</div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-md-4">
                         <label class="form-label">Km pr. tur (antagelse)</label>
                         <input class="form-control" type="number" step="1" @bind="kmPerTrip" />
-                        <div class="form-text">Brug fx gennemsnitlig rute tur/retur.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">CO₂ pr. km (kg/km)</label>
                         <input class="form-control" type="number" step="0.1" @bind="co2PerKm" />
-                        <div class="form-text">Afhænger af biltype/last. Brug et konservativt tal.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Omkostning pr. tur (kr)</label>
                         <input class="form-control" type="number" step="1" @bind="costPerTrip" />
-                        <div class="form-text">Internt estimat (chauffør, bil, planlægning mv.).</div>
                     </div>
                 </div>
 
                 <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="mb-3">Operationelt</h6>
-
-                                <div class="d-flex justify-content-between">
-                                    <div>Forventede ture/år (anbefalet)</div>
-                                    <div><b>@RecTripsPerYear.ToString("N0")</b></div>
-                                </div>
-
-                                <div class="d-flex justify-content-between">
-                                    <div>Ture/år (baseline, historisk)</div>
-                                    <div><b>@BaseTripsPerYearText</b></div>
-                                </div>
-
-                                <hr />
-
-                                <div class="d-flex justify-content-between">
-                                    <div><b>Potentiale: færre ture/år</b></div>
-                                    <div><b>@TripsSavedPerYearText</b></div>
-                                </div>
-
-                                <div class="text-muted small mt-2">
-                                    Baseline beregnes ud fra unikke “tømmedage” i perioden (restaffald via Indhold=710100).
-                                </div>
-                            </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <div class="text-muted small">Potentiale: færre ture/år</div>
+                            <div class="fs-5 fw-semibold">@tripsSaved.ToString("N0")</div>
                         </div>
                     </div>
-
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                <h6 class="mb-3">ESG (CO₂) & økonomi</h6>
-
-                                <div class="d-flex justify-content-between">
-                                    <div>CO₂/år (anbefalet)</div>
-                                    <div><b>@RecCo2Year.ToString("N0") kg</b></div>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <div>Omkostning/år (anbefalet)</div>
-                                    <div><b>@RecCostYear.ToString("N0") kr</b></div>
-                                </div>
-
-                                <hr />
-
-                                <div class="d-flex justify-content-between">
-                                    <div>CO₂/år (baseline)</div>
-                                    <div><b>@BaseCo2YearText</b></div>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <div>Omkostning/år (baseline)</div>
-                                    <div><b>@BaseCostYearText</b></div>
-                                </div>
-
-                                <hr />
-
-                                <div class="d-flex justify-content-between">
-                                    <div><b>Potentiale CO₂/år</b></div>
-                                    <div><b>@Co2SavedYearText</b></div>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <div><b>Potentiale kr/år</b></div>
-                                    <div><b>@CostSavedYearText</b></div>
-                                </div>
-
-                                <div class="text-muted small mt-2">
-                                    Estimatet fokuserer på transport/indsamling (Scope 1/3 afhænger af jeres ESG-ramme).
-                                </div>
-                            </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <div class="text-muted small">Potentiale CO₂/år</div>
+                            <div class="fs-5 fw-semibold">@co2Saved.ToString("N0") kg</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <div class="text-muted small">Potentiale kr/år</div>
+                            <div class="fs-5 fw-semibold">@costSaved.ToString("N0") kr</div>
                         </div>
                     </div>
                 </div>
-
-                <div class="card mt-3">
-                    <div class="card-body">
-                        <h6 class="mb-2">Sanity-check (restaffald, volumen-antagelse)</h6>
-
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="text-muted small">Antaget densitet</div>
-                                <div><b>@densityKgPerL.ToString("0.##") kg/L</b></div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-muted small">Est. volumen pr. dag</div>
-                                <div><b>@EstLitersPerDay.ToString("N0") L/dag</b></div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-muted small">Est. fyldning pr. tømning</div>
-                                <div><b>@EstFillAtPickup.ToString("P0")</b></div>
-                            </div>
-                        </div>
-
-                        <div class="text-muted small mt-2">
-                            Hurtig plausibilitetscheck: (kg/dag → liter/dag) sammenholdt med containerkapacitet og frekvens.
-                        </div>
-                    </div>
-                </div>
-
-                @if (baseline is not null && baseline.TripDays > 0)
-                {
-                    <div class="card mt-3">
-                        <div class="card-body">
-                            <h6 class="mb-2">Baseline nøgletal (historisk)</h6>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="text-muted small">Tømmedage i perioden</div>
-                                    <div><b>@baseline.TripDays</b></div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-muted small">Total kg (rest) i perioden</div>
-                                    <div><b>@baseline.TotalKg.ToString("N0")</b></div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="text-muted small">Kg pr. “tømmedag” (proxy)</div>
-                                    <div><b>@baseline.AvgKgPerTrip.ToString("N0")</b></div>
-                                </div>
-                            </div>
-                            <div class="text-muted small mt-2">
-                                Baseline er et “proxy” baseret på registrerede modtagelseslinjer pr. dato (ikke kontrakt/faktisk stop-tælling).
-                            </div>
-                        </div>
-                    </div>
-                }
             </div>
-        </div>
-
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary" @onclick="Back">Tilbage</button>
-            <button class="btn btn-primary" @onclick="Load">Genindlæs</button>
-            <button class="btn btn-outline-primary" @onclick="PrintPdf">Print / PDF</button>
         </div>
 
     </div>
 }
+
 else
 {
     <div>Ingen recommendation fundet.</div>
@@ -329,7 +324,7 @@ else
                 error = "Kunne ikke læse recommendation fra serveren.";
                 return;
             }
-
+InitSetupsFromRec();
             // baseline er “nice to have” – hvis den fejler, vis stadig recommendation
             var baseResp = await Http.GetAsync(baseUrl);
             if (baseResp.IsSuccessStatusCode)
@@ -422,5 +417,61 @@ else
         return (true, $"Anbefalingen kræver {r.ContainerCount} × 1100 L ({totalL:N0} L). Overvej stor-container/komprimator løsning.");
     return (false, "");
 }
+class Setup
+{
+    public int ContainerL { get; set; } = 1100;
+    public int ContainerCount { get; set; } = 1;
+    public int FrequencyDays { get; set; } = 14;
+}
 
+Setup Current { get; set; } = new();
+Setup Proposed { get; set; } = new();
+
+static readonly int[] AllowedSizes = { 120, 240, 660, 1100 };
+static readonly int[] AllowedFrequencies = { 3, 7, 10, 14, 21, 28, 35, 42, 56 };
+
+
+// kald den her lige efter du har sat rec (når Load() henter data)
+void InitSetupsFromRec()
+{
+    // Proposed starter altid på ML
+    Proposed.ContainerL = rec!.ContainerL;
+    Proposed.ContainerCount = rec!.ContainerCount;
+    Proposed.FrequencyDays = rec!.FrequencyDays;
+
+    // Current: start som “udgangspunkt”
+    // (Hvis du senere får kontraktdata, kan Current sættes fra API i stedet)
+    Current.ContainerL = rec!.ContainerL;
+    Current.ContainerCount = rec!.ContainerCount;
+    Current.FrequencyDays = rec!.FrequencyDays;
+}
+
+void ResetProposedToMl()
+{
+    if (rec is null) return;
+    Proposed.ContainerL = rec.ContainerL;
+    Proposed.ContainerCount = rec.ContainerCount;
+    Proposed.FrequencyDays = rec.FrequencyDays;
+}
+
+static double TripsPerYear(int frequencyDays)
+{
+    frequencyDays = Math.Max(1, frequencyDays);
+    return 365.0 / frequencyDays;
+}
+
+static double ExpectedFill(double kgPerDay, double densityKgPerLiter, int frequencyDays, int containerSizeLiters, int containerCount)
+{
+    kgPerDay = Math.Max(0, kgPerDay);
+    densityKgPerLiter = densityKgPerLiter > 0 ? densityKgPerLiter : 0.13;
+    frequencyDays = Math.Max(1, frequencyDays);
+    containerSizeLiters = Math.Max(1, containerSizeLiters);
+    containerCount = Math.Max(1, containerCount);
+
+    double litersPerDay = kgPerDay / densityKgPerLiter;
+    double litersPerEmptyTotal = litersPerDay * frequencyDays;
+    double totalCapacityLiters = containerCount * (double)containerSizeLiters;
+
+    return totalCapacityLiters <= 0 ? 0 : (litersPerEmptyTotal / totalCapacityLiters);
+}
 }
