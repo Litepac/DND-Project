@@ -18,7 +18,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<ITokenStorage, TokenStorage>();
 builder.Services.AddScoped<TokenAuthorizationMessageHandler>();
 
-// 🔑 Auth state provider (registrer som konkret type + som base type)
+// Auth state provider (registrer som konkret type + som base type)
 builder.Services.AddScoped<JwtAuthStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<JwtAuthStateProvider>());
 
