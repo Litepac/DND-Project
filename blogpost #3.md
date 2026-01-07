@@ -20,7 +20,7 @@ Systemet anvender **JWT-baseret autentifikation** med roller (Admin og Sales). L
 
 ### Login (Login.razor)
 
-- Tokenet gemmes client-side og bruges automatisk på alle efterfølgende API-kald via en DelegatingHandler.
+Tokenet gemmes client-side og bruges automatisk på alle efterfølgende API-kald via en DelegatingHandler.
 
 ```razor
 var resp = await Http.PostAsJsonAsync("api/auth/login", model);
