@@ -14,8 +14,6 @@ Stena Recycling og har dannet grundlag for systemets design, arkitektur og funkt
 
 >Status: Implementeret
 
-**Status: Implementeret**
-
 Systemet understøtter login med personlige brugerkonti og rollebaseret adgang (Sales og Admin).
 Autentifikation er implementeret ved hjælp af JWT (JSON Web Tokens) og ASP.NET Identity.
 
@@ -26,7 +24,7 @@ brugere kan kun tilgå systemet, hvis de er autentificerede.
 
 ### FR2 – Kunde- og containeroversigt
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Sales-brugere har adgang til et kunde-dashboard, som viser en oversigt over kunder,
 deres historiske data, tilknyttede containere samt afhentningsinformation.
@@ -38,7 +36,7 @@ overblik over kundedata og udvikling over tid.
 
 ### FR3 – Ineffektive tømninger (containerstørrelse)
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet identificerer kunder med ineffektive tømninger, baseret på fyldningsgrader
 under en fastlagt tærskel (standard 80 %).
@@ -50,7 +48,7 @@ identificere kunder, hvor containerstørrelse eller opsætning kan optimeres.
 
 ### FR4 – Anbefaling af tømningsfrekvens
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet anvender historiske data og maskinlæringsbaserede beregninger til at foreslå
 alternative tømningsfrekvenser for udvalgte kunder.
@@ -62,7 +60,7 @@ for salgsbrugere.
 
 ### FR5 – CO₂- og omkostningspåvirkning
 
-**Status: Implementeret**
+>Status: Implementeret
 
 For hver anbefaling beregner systemet estimerede ændringer i:
 
@@ -77,7 +75,7 @@ for at understøtte dokumentation af både økonomiske og bæredygtige konsekven
 
 ### FR6 – Filtrering og søgning
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet understøtter søgning og filtrering af kunder baseret på blandt andet:
 
@@ -93,7 +91,7 @@ på relevante cases.
 
 ### FR7 – Brugeradministration
 
-**Status: Delvist implementeret**
+>Status: Delvist implementeret
 
 Brugere og roller er teknisk understøttet via ASP.NET Identity, og roller anvendes aktivt
 i systemet.
@@ -108,7 +106,7 @@ afgrænsning, som ikke påvirker systemets kernefunktionalitet.
 
 ### NFR1 – Brugervenlighed
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet er opbygget med fokus på enkel navigation og tydelig visuel struktur.
 Brugere kan udføre centrale opgaver uden behov for omfattende oplæring.
@@ -117,7 +115,7 @@ Brugere kan udføre centrale opgaver uden behov for omfattende oplæring.
 
 ### NFR2 – Performance og skalerbarhed
 
-**Status: Delvist implementeret**
+>Status: Delvist implementeret
 
 Systemet har acceptable svartider ved de anvendte datamængder og under normal brug.
 Der er ikke gennemført egentlige stresstests eller formel skaleringstest.
@@ -126,7 +124,7 @@ Der er ikke gennemført egentlige stresstests eller formel skaleringstest.
 
 ### NFR3 – Sikkerhed og adgangskontrol
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet anvender sikker autentifikation via JWT og rollebaseret adgangskontrol.
 Kun autoriserede brugere kan tilgå API’et og frontend-applikationen.
@@ -135,7 +133,7 @@ Kun autoriserede brugere kan tilgå API’et og frontend-applikationen.
 
 ### NFR4 – Datakvalitet og plausibilitet
 
-**Status: Delvist implementeret**
+>Status: Delvist implementeret
 
 Systemet håndterer og markerer urealistiske eller ekstreme værdier (outliers) i data,
 så disse ikke giver misvisende resultater.
@@ -146,7 +144,7 @@ Et fuldt workflow for manuel godkendelse eller rettelse af data er ikke implemen
 
 ### NFR5 – Interoperabilitet
 
-**Status: Implementeret**
+>Status: Implementeret
 
 Systemet anvender SQL Server som database, administreret via SQL Server Management Studio (SSMS),
 og tilgår data gennem Entity Framework Core.
