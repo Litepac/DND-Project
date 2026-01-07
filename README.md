@@ -100,7 +100,7 @@ Arkitekturen er opdelt i klare lag med fokus på:
 
 Projektets design og implementering er dokumenteret gennem følgende blogposts:
 
-- **[Blogpost 1 – Project Setup & Architecture](./blogpost#1.md)**
+- **[Blogpost 1 – Project Setup & Architecture](./blogpost #1.md)**
 - **[Blogpost 2 – Web Service Design & Implementation](./blogpost#2.md)**
 - **[Blogpost 3 – Authentication & Authorization](./blogpost#3.md)**
 - **[Blogpost 4 – Machine Learning & Recommendations](./blogpost#4.md)**
