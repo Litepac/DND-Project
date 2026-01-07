@@ -2,61 +2,108 @@
 
 ## Formål
 
-Formålet med denne afsluttende blogpost er at give en samlet status på projektets færdiggørelse samt en kortfattet opsummering af projektets endelige resultat.
+Denne afsluttende blogpost giver en samlet status på projektets afsluttende udviklingsarbejde samt en overordnet vurdering af projektets resultat. Fokus er på, hvad der konkret er blevet færdiggjort, hvilke dele der fungerer som planlagt, og hvordan systemet samlet set opfylder de opstillede krav.
 
 ---
 
-## 1. Final Development Update
+## Final Development Update
 
-I den afsluttende fase af projektet har fokus været på at færdiggøre, stabilisere og kvalitetssikre hele løsningen. Arbejdet har primært bestået af følgende aktiviteter:
+I den afsluttende fase af projektet har fokus været på **stabilisering, integration og færdiggørelse** frem for nye funktioner. Arbejdet har primært bestået af følgende:
 
-- **Færdiggørelse af backend**  
-  Alle RESTful API-endpoints er implementeret, testet og dokumenteret via Swagger. Autentifikation og autorisation er sikret gennem JWT-baseret login.
+### Backend (Web API)
 
-- **Frontend-integration**  
-  Blazor WebAssembly er fuldt integreret med backend-API’et, herunder automatisk håndtering af JWT-token via browserens localStorage.
+- Færdiggørelse af RESTful API endpoints til:
+  - Kundeoversigter og dashboards
+  - Tømnings- og kapacitetsanalyse
+  - ML-baserede anbefalinger (containerstørrelse og frekvens)
+- Konsolidering af datatilgang via **Entity Framework Core** oven på en eksisterende SQL Server-database.
+- Implementering af **JWT-baseret autentifikation** med roller (Admin / Sales).
+- Sikring af, at alle endpoints som udgangspunkt er beskyttet via `[Authorize]`, med eksplicitte undtagelser hvor relevant.
+- Fokus på robusthed, fx:
+  - Plausibilitetschecks i ML-anbefalinger
+  - Håndtering af edge cases og manglende data
+  - Defensive defaults i beregninger (fx maksimum antal containere)
 
-- **Maskinlæringslogik**  
-  ML-komponenterne er færdigimplementeret og anvendes til træning, baseline-beregninger samt generering af anbefalinger for kunder.
+### Frontend (Blazor WebAssembly)
 
-- **Stabilitet og fejlhåndtering**  
-  Der er gennemført tests af centrale brugerflows for at sikre korrekt håndtering af fejl, ugyldige inputs og autorisationsproblemer.
+- Implementering af et samlet webinterface med følgende hovedsider:
+  - Login
+  - Kunde-dashboard
+  - Tømningsanalyse (container efficiency)
+  - ML-anbefalinger (kundeoversigt og kundedetaljer)
+- Integration til API via `HttpClient` med automatisk vedhæftning af JWT-token.
+- Rollebaseret navigation og adgangskontrol i UI’et.
+- Fokus på brugervenlighed gennem:
+  - Filtrering, søgning og sortering
+  - Visualiseringer (grafer, histogrammer, KPI’er)
+  - Forklarende labels og advarsler ved outliers
 
-- **Dokumentation**  
-  Projektets arkitektur, API-design og sikkerhedsløsninger er dokumenteret i de tidligere blogposts med fokus på læsbarhed og struktur.
+### Kendte begrænsninger
 
----
+- Der er oprettet brugere og roller, men der er **ikke implementeret fuld CRUD-brugeradministration** i UI’et.
+- Rollebaseret adgang er implementeret teknisk, men ikke alle endpoints er differentieret yderligere pr. rolle.
+- Systemet er udviklet som en prototype med fokus på funktionalitet og arkitektur frem for fuld produktionsklarhed.
 
-## 2. Project Outcome Summary
-
-Det færdige projekt resulterer i en fuldt fungerende webbaseret løsning med følgende egenskaber:
-
-- En **skalerbar backend** baseret på ASP.NET Core og REST-principper  
-- **Sikker autentifikation** via JWT og ASP.NET Identity  
-- En **moderne frontend** bygget med Blazor WebAssembly  
-- Integration af **maskinlæring** til datadrevne anbefalinger  
-- Klar adskillelse mellem frontend, backend og datalag  
-
-Løsningen demonstrerer en sammenhængende arkitektur, hvor backend håndterer forretningslogik og sikkerhed, mens frontend fokuserer på brugeroplevelse og præsentation af data.
-
----
-
-## 3. Demonstration
-
-Projektet kan demonstreres ved at:
-
-1. Logge ind via frontend-applikationen
-2. Verificere adgang til beskyttede API-endpoints
-3. Udføre ML-træning og generere anbefalinger
-4. Vise data og anbefalinger i dashboardet
-
-Demonstrationen viser, hvordan alle dele af systemet arbejder sammen i én samlet løsning.
+Disse begrænsninger er kendte og accepterede inden for projektets tidsramme og scope.
 
 ---
 
-## Konklusion
+## Demonstration (Systemets funktionalitet)
 
-Projektet er færdiggjort i overensstemmelse med de opstillede krav og mål.  
-Den samlede løsning er stabil, veldokumenteret og klar til videreudvikling eller produktionstilpasning.
+Ved en demonstration kan følgende flow vises:
 
-Denne blogpost markerer afslutningen på projektet.
+1. **Login**
+   - Bruger logger ind med e-mail og adgangskode.
+   - JWT-token udstedes og gemmes i browserens localStorage.
+
+2. **Kundeoverblik**
+   - Oversigt over kunder med aggregerede nøgletal.
+   - Valg af periode og søgning i kundelisten.
+
+3. **Tømningsanalyse**
+   - Identifikation af ineffektive tømninger.
+   - Visualisering af fyldningsgrader, outliers og stabilitet over tid.
+
+4. **ML-anbefalinger**
+   - ML-baseret forslag til containeropsætning og frekvens.
+   - Sammenligning mellem nuværende og foreslået setup.
+   - Estimeret effekt på antal ture, CO₂ og omkostninger.
+
+Dette demonstrerer sammenhængen mellem data, analyse og beslutningsstøtte.
+
+---
+
+## Project Outcome – Samlet vurdering
+
+Projektets overordnede resultat vurderes som **vellykket** inden for det fastlagte scope.
+
+### Opnåede mål
+
+- Et fuldt funktionelt **RESTful backend-system** med klar domæneopdeling.
+- Et **webbaseret frontend-interface**, der anvender API’et korrekt og sikkert.
+- Integration af **machine learning** som beslutningsstøtte, ikke som sort boks.
+- En arkitektur, der adskiller:
+  - Data access
+  - Forretningslogik
+  - Præsentationslag
+- Understøttelse af centrale funktionelle krav som:
+  - Login og roller
+  - Kundeoverblik
+  - Identifikation af ineffektivitet
+  - Datadrevne anbefalinger
+
+### Refleksion
+
+Projektet demonstrerer en realistisk og professionel tilgang til systemudvikling, hvor der arbejdes med:
+
+- eksisterende databaser (SQL Server / SSMS)
+- moderne webteknologier
+- klare arkitekturprincipper
+
+Selvom ikke alle ønskede funktioner nåede at blive fuldt implementeret, viser løsningen tydeligt:
+
+- teknisk forståelse
+- evnen til at prioritere
+- og sammenhæng mellem krav, design og implementering
+
+Projektet udgør dermed et solidt fundament for videreudvikling mod en fuld produktionsløsning.
