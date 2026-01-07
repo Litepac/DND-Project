@@ -65,7 +65,7 @@ dotnet run
 
 Når API’en er startet, skriver den adressen i konsollen (typisk `http://localhost:5230/`).
 
-###  WEB – Blazor WebAssembly Frontend
+### WEB – Blazor WebAssembly Frontend
 
 Åbn en **ny** terminal:
 
