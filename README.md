@@ -100,11 +100,11 @@ Arkitekturen er opdelt i klare lag med fokus på:
 
 Projektets design og implementering er dokumenteret gennem følgende blogposts:
 
-- **[Blogpost 1 – Project Setup & Architecture](./blogpost1.md)**
-- **[Blogpost 2 – Web Service Design & Implementation](./blogpost2.md)**
-- **[Blogpost 3 – Authentication & Authorization](./blogpost3.md)**
-- **[Blogpost 4 – Machine Learning & Recommendations](./blogpost4.md)**
-- **[Blogpost 5 – Frontend Integration](./blogpost5.md)**
-- **[Blogpost 6 – Project Conclusion & Demonstration](./blogpost6.md)**
+- **[Blogpost 1 – Project Setup & Architecture](./blogpost#1.md)**
+- **[Blogpost 2 – Web Service Design & Implementation](./blogpost#2.md)**
+- **[Blogpost 3 – Authentication & Authorization](./blogpost#3.md)**
+- **[Blogpost 4 – Machine Learning & Recommendations](./blogpost#4.md)**
+- **[Blogpost 5 – Frontend Integration](./blogpost#5.md)**
+- **[Blogpost 6 – Project Conclusion & Demonstration](./blogpost#6.md)**
 
 Alle blogposts er skrevet i Markdown og er en del af den samlede projektdokumentation.
