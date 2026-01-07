@@ -36,9 +36,11 @@ builder.Services.AddDbContext<AppDbContext>(o =>
 
 builder.Services.AddDbContext<AuthDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("AuthConnection")));
+```
 
+## Identity & JWT Authentication
 
-Identity & JWT Authentication
+```csharp
 builder.Services
     .AddIdentityCore<ApplicationUser>()
     .AddRoles<IdentityRole>()
@@ -60,14 +62,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 ```
 
-### Alle endpoints kræver login som standard
+## Alle endpoints kræver login som standard
 
+```csharp
 builder.Services.AddAuthorization(o =>
 {
     o.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
 });
+```
 
 ### Overblik over Web API Endpoints
 
@@ -75,16 +79,16 @@ API’et er dokumenteret via Swagger og opdelt i følgende hovedområder.
 
 ## Auth
 
-POST /api/auth/login
-GET /api/auth/ping-protected
+- POST /api/auth/login
+- GET /api/auth/ping-protected
 
 ## ML
 
-POST /api/ml/train
-POST /api/ml/recommend
-GET /api/ml/recommend-one
-GET /api/ml/baseline
-GET /api/ml/baseline-v2
+- POST /api/ml/train
+- POST /api/ml/recommend
+- GET /api/ml/recommend-one
+- GET /api/ml/baseline
+- GET /api/ml/baseline-v2
 
 ## Stena Customer Dashboard
 
@@ -122,10 +126,10 @@ public IActionResult PingProtected()
 
 ## MLController håndterer
 
-Træning af model
-Anbefaling af container-setup
-Baseline- og effektberegninger
-Træning af model
+- Træning af model
+- Anbefaling af container-setup
+- Baseline- og effektberegninger
+- Træning af model
 
 ```csharp
 [HttpPost("train")]
@@ -191,8 +195,9 @@ public sealed class TokenStorage : ITokenStorage
 }
 ```
 
+## Automatisk vedhæftning af Bearer-token
+
 ```csharp
-Automatisk vedhæftning af Bearer-token
 public sealed class TokenAuthorizationMessageHandler : DelegatingHandler
 {
     private readonly ITokenStorage _tokens;
