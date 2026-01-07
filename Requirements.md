@@ -12,6 +12,8 @@ Stena Recycling og har dannet grundlag for systemets design, arkitektur og funkt
 
 ### FR1 – Login og roller  
 
+>Status: Implementeret
+
 **Status: Implementeret**
 
 Systemet understøtter login med personlige brugerkonti og rollebaseret adgang (Sales og Admin).
@@ -36,7 +38,7 @@ overblik over kundedata og udvikling over tid.
 
 ### FR3 – Ineffektive tømninger (containerstørrelse)
 
-*Status: Implementeret*
+**Status: Implementeret**
 
 Systemet identificerer kunder med ineffektive tømninger, baseret på fyldningsgrader
 under en fastlagt tærskel (standard 80 %).
@@ -48,7 +50,7 @@ identificere kunder, hvor containerstørrelse eller opsætning kan optimeres.
 
 ### FR4 – Anbefaling af tømningsfrekvens
 
-Status: Implementeret*
+**Status: Implementeret**
 
 Systemet anvender historiske data og maskinlæringsbaserede beregninger til at foreslå
 alternative tømningsfrekvenser for udvalgte kunder.
