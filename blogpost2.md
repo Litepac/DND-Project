@@ -122,9 +122,9 @@ public IActionResult PingProtected()
 }
 ```
 
-### MLController – Maskinlæring og anbefalinger
+## MLController – ML og anbefalinger
 
-## MLController håndterer
+### MLController håndterer
 
 - Træning af model
 - Anbefaling af container-setup
@@ -140,7 +140,7 @@ public async Task<IActionResult> Train(DateTime? from, DateTime? to)
 }
 ```
 
-## Anbefaling for én kunde
+### Anbefaling for én kunde
 
 ```csharp
 [HttpGet("recommend-one")]
@@ -170,11 +170,11 @@ public async Task<IActionResult> RecommendOne(string customerNo)
 }
 ```
 
-### File storage – localStorage til JWT
+## File storage – localStorage til JWT
 
 Frontend (Blazor WebAssembly) anvender browserens localStorage til at gemme JWT-token.
 
-## TokenStorage
+### TokenStorage
 
 ```csharp
 public sealed class TokenStorage : ITokenStorage
@@ -195,7 +195,7 @@ public sealed class TokenStorage : ITokenStorage
 }
 ```
 
-## Automatisk vedhæftning af Bearer-token
+### Automatisk vedhæftning af Bearer-token
 
 ```csharp
 public sealed class TokenAuthorizationMessageHandler : DelegatingHandler
