@@ -40,9 +40,9 @@ Det betyder, at vores controllers og services kan bruge `StenaReceipts` / `Stena
 
 ---
 
-## 2 Eksempler på refaktorering til Entity Framework
+## Eksempler på refaktorering til Entity Framework
 
-### 2.1 DbContext og DbSet – “tabeller som properties”
+### DbContext og DbSet – “tabeller som properties”
 
 Vores `AppDbContext` indeholder både domæne-tabeller (vores egne) og Stena-tabeller (legacy/operational data). Her er et udsnit af konfigurationen:
 
@@ -124,7 +124,7 @@ Det er et godt eksempel på “EF-first” workflow: i stedet for at have ad-hoc
 
 ## LINQ vs traditionel SQL (med konkrete eksempler)
 
-3.1 Traditionel tilgang (SQL-tænkning)
+Traditionel tilgang (SQL-tænkning)
 
 I en klassisk SQL-baseret tilgang ville man typisk skrive noget i stil med:
 
