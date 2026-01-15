@@ -1,6 +1,9 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using DNDProject.Api.Data;
+using System.Data;
+using System.Text.RegularExpressions;
+
 
 namespace DNDProject.Api.ML;
 
