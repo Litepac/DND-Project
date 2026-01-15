@@ -480,7 +480,7 @@ else
     Setup Proposed { get; set; } = new();
 
     static readonly int[] AllowedSizes = { 120, 240, 660, 1100 };
-    static readonly int[] AllowedFrequencies = { 3, 7, 10, 14, 21, 28, 35, 42, 56 };
+    static readonly int[] AllowedFrequencies = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 17, 21, 30 };
 
     static int NormLiters(int liters) => AllowedSizes.Contains(liters) ? liters : 660;
     static int NormCount(int n) => Math.Clamp(n, 1, 30);
