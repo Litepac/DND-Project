@@ -14,8 +14,8 @@
         </div>
 
         <div class="d-flex gap-2">
-            <button class="btn btn-primary" @onclick='() => Go("ml-customers")'>ML – Top kunder</button>
-            <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Kunde-dashboard</button>
+            <button class="btn btn-primary" @onclick='() => Go("ml-customers")'>ML Recommendation</button>
+            <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Customer Dashboard</button>
         </div>
     </div>
 
@@ -26,7 +26,7 @@
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div class="fw-bold">Kunde-dashboard</div>
+                        <div class="fw-bold">Customer Dashboard</div>
                         <span class="badge bg-secondary">Overview</span>
                     </div>
                     <div class="text-muted small mb-3">
@@ -42,7 +42,7 @@
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div class="fw-bold">Tømningsanalyse</div>
+                        <div class="fw-bold">Discharge Analytics</div>
                         <span class="badge bg-secondary">Analytics</span>
                     </div>
                     <div class="text-muted small mb-3">
@@ -58,7 +58,7 @@
             <div class="card h-100 shadow-sm border-primary">
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <div class="fw-bold">ML – Top kunder</div>
+                        <div class="fw-bold">ML Recommendation</div>
                         <span class="badge bg-primary">ML</span>
                     </div>
                     <div class="text-muted small mb-3">
@@ -73,12 +73,12 @@
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="mb-2">Hurtigt overblik</h5>
+                    <h5 class="mb-2">Quick Overview</h5>
 
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
                             <div class="p-3 rounded border">
-                                <div class="fw-bold mb-1">ML-anbefaling</div>
+                                <div class="fw-bold mb-1">ML Recommendation</div>
                                 <div class="text-muted small">
                                     Predikér kg/dag og få container + frekvens.
                                 </div>
@@ -105,9 +105,9 @@
                     <hr class="my-3" />
 
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-outline-primary" @onclick='() => Go("ml-customers")'>Gå til ML</button>
-                        <button class="btn btn-outline-secondary" @onclick='() => Go("container-efficiency")'>Gå til analyse</button>
-                        <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Gå til dashboard</button>
+                        <button class="btn btn-outline-primary" @onclick='() => Go("ml-customers")'>Go to ML</button>
+                        <button class="btn btn-outline-secondary" @onclick='() => Go("container-efficiency")'>Go to analysis</button>
+                        <button class="btn btn-outline-secondary" @onclick='() => Go("customer-dashboard")'>Go to dashboard</button>
                     </div>
                 </div>
             </div>
